@@ -37,19 +37,23 @@ class ActorCriticModel(nn.Module):
     def __init__(self, state_size, action_size, device, hidsize1=512, hidsize2=256):
         super(ActorCriticModel, self).__init__()
         self.device = device
-        self.actor = nn.Sequential(
+
+        self.common = nn.Sequential(
             nn.Linear(state_size, hidsize1),
-            nn.Tanh(),
+            nn.PReLU(),
             nn.Linear(hidsize1, hidsize2),
+            nn.Tanh(),
+        ).to(self.device)
+
+        self.actor = nn.Sequential(
+            nn.Linear(hidsize2, hidsize2),
             nn.Tanh(),
             nn.Linear(hidsize2, action_size),
             nn.Softmax(dim=-1)
         ).to(self.device)
 
         self.critic = nn.Sequential(
-            nn.Linear(state_size, hidsize1),
-            nn.Tanh(),
-            nn.Linear(hidsize1, hidsize2),
+            nn.Linear(hidsize2, hidsize2),
             nn.Tanh(),
             nn.Linear(hidsize2, 1)
         ).to(self.device)
@@ -58,16 +62,21 @@ class ActorCriticModel(nn.Module):
         raise NotImplementedError
 
     def get_actor_dist(self, state):
-        action_probs = self.actor(state)
+        common_state = self.common(state)
+        action_probs = self.actor(common_state)
         dist = Categorical(action_probs)
         return dist
 
     def evaluate(self, states, actions):
-        action_probs = self.actor(states)
+        common_states = self.common(states)
+
+        action_probs = self.actor(common_states)
         dist = Categorical(action_probs)
         action_logprobs = dist.log_prob(actions)
+
         dist_entropy = dist.entropy()
-        state_value = self.critic(states)
+        state_value = self.critic(common_states)
+
         return action_logprobs, torch.squeeze(state_value), dist_entropy
 
     def save(self, filename):
