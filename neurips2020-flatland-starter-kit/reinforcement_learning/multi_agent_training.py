@@ -266,9 +266,31 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
         # Build initial agent-specific observations
         for agent_handle in train_env.get_agent_handles():
             if tree_observation.check_is_observation_valid(obs[agent_handle]):
-                agent_obs[agent_handle] = tree_observation.get_normalized_observation(obs[agent_handle],
-                                                                                      observation_tree_depth,
-                                                                                      observation_radius=observation_radius)
+                if False: # CH3: When it is time...
+                    # NOTE: This bit might look unecessary, but it's actually
+                    # needed to populate agent_prev_obs...
+
+                    state_vector = [
+                        # == ROOT ==
+                        *semi_normalise_tree_obs(train_env, obs, agent_handle, num_agents_on_map),
+
+                        # == ROOT EXTRA ==
+                        train_env.number_of_agents,
+                        *get_self_extra_states(env, obs, agent_handle),
+                        # priority,
+                        # staticness,
+                        *get_self_extra_knn_states(train_env, agent_handle, agent_handles, kd_tree, k_num=5),
+
+                        # == RVNN CHILDREN ==
+                        # policy.rvnn(something)
+                    ]
+
+                    agent_obs[agent_handle] = state_vector # CH3: OBS HACK IS HERE!!!
+                else:
+                    agent_obs[agent_handle] = tree_observation.get_normalized_observation(obs[agent_handle],
+                                                                                          observation_tree_depth,
+                                                                                          observation_radius=observation_radius)
+
                 agent_prev_obs[agent_handle] = agent_obs[agent_handle].copy()
 
         # Max number of steps per episode
@@ -279,12 +301,40 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
 
         # Run episode
         policy.start_episode(train=True)
+
         for step in range(max_steps - 1):
             inference_timer.start()
             policy.start_step(train=True)
+
+            # Compute expensive stuff ONCE per step
+            if False: # CH3: Set to True when ready
+                agent_positions, agent_handles = get_agent_positions(train_env)
+                kd_tree = KDTree(agent_positions)
+
+                # This is -NOT- total agent count or active agent count!
+                num_agents_on_map = get_num_agents_on_map(train_env)
+
             for agent_handle in train_env.get_agent_handles():
                 agent = train_env.agents[agent_handle]
                 if info['action_required'][agent_handle]:
+                    if False: # CH3: When it is time...
+                        state_vector = [
+                            # == ROOT ==
+                            *semi_normalise_tree_obs(train_env, obs, agent_handle, num_agents_on_map),
+
+                            # == ROOT EXTRA ==
+                            train_env.number_of_agents,
+                            *get_self_extra_states(env, obs, agent_handle),
+                            # priority,
+                            # staticness,
+                            *get_self_extra_knn_states(train_env, agent_handle, agent_handles, kd_tree, k_num=5),
+
+                            # == RVNN CHILDREN ==
+                            # policy.rvnn(something)
+                        ]
+
+                        agent_obs[agent_handle] = state_vector # CH3: OBS HACK IS HERE!!!
+
                     update_values[agent_handle] = True
                     action = policy.act(agent_handle, agent_obs[agent_handle], eps=eps_start)
                     action_count[map_action(action)] += 1
@@ -295,12 +345,29 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                     update_values[agent_handle] = False
                     action = 0
                 action_dict.update({agent_handle: action})
+
             policy.end_step(train=True)
             inference_timer.end()
 
             # Environment step
             step_timer.start()
             next_obs, all_rewards, done, info = train_env.step(map_actions(action_dict))
+
+            # CH3: HACK REWARDS HERE
+            if False:
+                # SERIOUSLY UPDATE THEM!!!
+
+                # +10: Agent in target
+                # -0.35: Agent getting closer to target
+                # -0.5: Regular step
+                # -3: First Stopped count (and not done and not malfunctioning)
+                # -1: Stopped (and not done and not malfunctioning)
+                # -5: Stopping on switch
+                # -7: Not following priority ??
+                # -30: Deadlock (10 stop counts)
+                # -1000: Didn't finish on last step
+                hacked_rewards = 0 # SOMETHING SOMETHING
+
             step_timer.end()
 
             # Render an episode at some interval
@@ -320,7 +387,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                     policy.step(agent_handle,
                                 agent_prev_obs[agent_handle],
                                 map_action_policy(agent_prev_action[agent_handle]),
-                                all_rewards[agent_handle],
+                                all_rewards[agent_handle], # CH3: HACK REWARDS HERE, DON'T USE ALL_REWARDS
                                 agent_obs[agent_handle],
                                 done[agent_handle])
                     learn_timer.end()
@@ -331,12 +398,16 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                 # Preprocess the new observations
                 if tree_observation.check_is_observation_valid(next_obs[agent_handle]):
                     preproc_timer.start()
-                    agent_obs[agent_handle] = tree_observation.get_normalized_observation(next_obs[agent_handle],
-                                                                                          observation_tree_depth,
-                                                                                          observation_radius=observation_radius)
+
+                    if False: # CH3: When it's time...
+                        pass # Yep, because we do this step ontop
+                    else:
+                        agent_obs[agent_handle] = tree_observation.get_normalized_observation(next_obs[agent_handle],
+                                                                                              observation_tree_depth,
+                                                                                              observation_radius=observation_radius)
                     preproc_timer.end()
 
-                score += all_rewards[agent_handle]
+                score += all_rewards[agent_handle] # For evaluation only
 
             nb_steps = step
 
@@ -478,6 +549,15 @@ def eval_policy(env, tree_observation, policy, train_params, obs_params):
         policy.start_episode(train=False)
         for step in range(max_steps - 1):
             policy.start_step(train=False)
+
+            # Compute expensive stuff ONCE per step
+            if False: # CH3: Set to True when ready
+                agent_positions, agent_handles = get_agent_positions(train_env)
+                kd_tree = KDTree(agent_positions)
+
+                # This is -NOT- total agent count or active agent count!
+                num_agents_on_map = get_num_agents_on_map(train_env)
+
             for agent in env.get_agent_handles():
                 if tree_observation.check_is_observation_valid(agent_obs[agent]):
                     agent_obs[agent] = tree_observation.get_normalized_observation(obs[agent], tree_depth=tree_depth,
@@ -486,10 +566,33 @@ def eval_policy(env, tree_observation, policy, train_params, obs_params):
                 action = 0
                 if info['action_required'][agent]:
                     if tree_observation.check_is_observation_valid(agent_obs[agent]):
-                        action = policy.act(agent, agent_obs[agent], eps=0.0)
+                        if False: # CH3: When it is time...
+                            state_vector = [
+                                # == ROOT ==
+                                *semi_normalise_tree_obs(train_env, obs, agent_handle, num_agents_on_map),
+
+                                # == ROOT EXTRA ==
+                                train_env.number_of_agents,
+                                *get_self_extra_states(env, obs, agent_handle),
+                                # priority,
+                                # staticness,
+                                *get_self_extra_knn_states(train_env, agent_handle, agent_handles, kd_tree, k_num=5),
+
+                                # == RVNN CHILDREN ==
+                                # policy.rvnn(something)
+                            ]
+
+                            action = policy.act(agent, state_vector, eps=0.0)
+                        else:
+                            agent_obs[agent_handle] = tree_observation.get_normalized_observation(obs[agent_handle],
+                                                                                                  observation_tree_depth,
+                                                                                                  observation_radius=observation_radius)
+                            action = policy.act(agent, agent_obs[agent], eps=0.0)
                 action_dict.update({agent: action})
             policy.end_step(train=False)
             obs, all_rewards, done, info = env.step(map_actions(action_dict))
+
+            # No reward hacking here
 
             for agent in env.get_agent_handles():
                 score += all_rewards[agent]
