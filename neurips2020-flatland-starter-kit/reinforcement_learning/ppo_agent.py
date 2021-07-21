@@ -121,13 +121,13 @@ class PPOPolicy(LearningPolicy):
         else:
             self.hidsize = 128
             self.learning_rate = 1.0e-3
-            self.gamma = 0.95
+            self.gamma = 0.99
             self.buffer_size = 32_000
             self.batch_size = 1024
             self.device = torch.device("cpu")
 
-        self.surrogate_eps_clip = 0.1
-        self.K_epoch = 10
+        self.surrogate_eps_clip = 0.2
+        self.K_epoch = 40
         self.weight_loss = 0.5
         self.weight_entropy = 0.01
 
@@ -140,7 +140,15 @@ class PPOPolicy(LearningPolicy):
         self.actor_critic_model = ActorCriticModel(state_size, action_size,self.device,
                                                    hidsize1=self.hidsize,
                                                    hidsize2=self.hidsize)
-        self.optimizer = optim.Adam(self.actor_critic_model.parameters(), lr=self.learning_rate)
+
+        self.learning_rate_actor = self.learning_rate
+        self.learning_rate_critic = self.learning_rate * 5
+
+        self.optimizer = optim.Adam(
+            [{'params': self.actor_critic_model.common.parameters(), 'lr': self.learning_rate_actor}
+             {'params': self.actor_critic_model.actor.parameters(), 'lr': self.learning_rate_actor},
+             {'params': self.actor_critic_model.critic.parameters(), 'lr': self.learning_rate_critic}]
+        )
         self.loss_function = nn.MSELoss()  # nn.SmoothL1Loss()
 
     def reset(self, env):
@@ -190,13 +198,10 @@ class PPOPolicy(LearningPolicy):
 
             state_list.insert(0, state_i)
             action_list.insert(0, action_i)
-            if done_i:
-                discounted_reward = 0
-                done_list.insert(0, 1)
-            else:
-                done_list.insert(0, 0)
+            done_list.insert(0, int(done_i))
 
-            discounted_reward = reward_i + self.gamma * discounted_reward
+            discounted_reward = reward_i + self.gamma * discounted_reward * (1.0-int(done_i))
+
             reward_list.insert(0, discounted_reward)
             state_next_list.insert(0, state_next_i)
             prob_a_list.insert(0, prob_action_i)
