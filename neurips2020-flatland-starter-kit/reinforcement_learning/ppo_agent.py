@@ -278,7 +278,7 @@ class PPOPolicy(LearningPolicy):
                     self.optimizer.step()
 
                     # Transfer the current loss to the agents loss (information) for debug purpose only
-                    # self.loss = loss.mean().detach().cpu().numpy()
+                    self.loss = loss.mean().detach().cpu().numpy()
 
         # Reset all collect transition data
         self.current_episode_memory.reset()
