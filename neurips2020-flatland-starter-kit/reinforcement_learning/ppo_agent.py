@@ -80,7 +80,8 @@ class ActorCriticModel(nn.Module):
         return action_logprobs, torch.squeeze(state_value), dist_entropy
 
     def save(self, filename):
-        # print("Saving model from checkpoint:", filename)
+        print("Saving model from checkpoint:", filename)
+        torch.save(self.common.state_dict(), filename + ".common")
         torch.save(self.actor.state_dict(), filename + ".actor")
         torch.save(self.critic.state_dict(), filename + ".value")
 
@@ -95,6 +96,7 @@ class ActorCriticModel(nn.Module):
 
     def load(self, filename):
         print("load model from file", filename)
+        self.common = self._load(self.common, filename + ".common")
         self.actor = self._load(self.actor, filename + ".actor")
         self.critic = self._load(self.critic, filename + ".value")
 
