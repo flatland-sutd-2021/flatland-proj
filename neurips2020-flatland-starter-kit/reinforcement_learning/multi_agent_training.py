@@ -263,13 +263,20 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
         nb_steps = 0
         actions_taken = []
 
+        # Compute expensive stuff ONCE per step
+        if False: # CH3: Set to True when ready
+            agent_positions, agent_handles = get_agent_positions(train_env)
+            kd_tree = KDTree(agent_positions)
+
+            # This is -NOT- total agent count or active agent count!
+            num_agents_on_map = get_num_agents_on_map(train_env)
+
         # Build initial agent-specific observations
         for agent_handle in train_env.get_agent_handles():
             if tree_observation.check_is_observation_valid(obs[agent_handle]):
                 if False: # CH3: When it is time...
                     # NOTE: This bit might look unecessary, but it's actually
                     # needed to populate agent_prev_obs...
-
                     state_vector = [
                         # == ROOT ==
                         *semi_normalise_tree_obs(train_env, obs, agent_handle, num_agents_on_map),
