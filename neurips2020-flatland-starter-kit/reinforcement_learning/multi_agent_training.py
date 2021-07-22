@@ -250,6 +250,9 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
             number_of_agents = int(min(n_agents, 1 + np.floor(episode_idx / 200)))
             train_env_params.n_agents = episode_idx % number_of_agents + 1
 
+        if False: # CH3: DYNAMICALLY CHANGE ENV PARAMS HERE!!?!?!
+            pass
+
         train_env = create_rail_env(train_env_params, tree_observation)
         obs, info = train_env.reset(regenerate_rail=True, regenerate_schedule=True)
         policy.reset(train_env)
@@ -471,7 +474,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                 100 * smoothed_completion,
                 eps_start,
                 format_action_prob(action_probs)
-            ), end=" ")
+            ), end=" ", flush=True)
 
         # Evaluate policy and log results at some interval
         if episode_idx % checkpoint_interval == 0 and n_eval_episodes > 0:

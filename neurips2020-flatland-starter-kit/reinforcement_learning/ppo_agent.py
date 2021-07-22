@@ -40,7 +40,7 @@ class ActorCriticModel(nn.Module):
 
         self.common = nn.Sequential(
             nn.Linear(state_size, hidsize1),
-            nn.PReLU(),
+            nn.Tanh(),
             nn.Linear(hidsize1, hidsize2),
             nn.Tanh(),
         ).to(self.device)
@@ -83,7 +83,7 @@ class ActorCriticModel(nn.Module):
         print("Saving model from checkpoint:", filename)
         torch.save(self.common.state_dict(), filename + ".common")
         torch.save(self.actor.state_dict(), filename + ".actor")
-        torch.save(self.critic.state_dict(), filename + ".value")
+        torch.save(self.critic.state_dict(), filename + ".critic")
 
     def _load(self, obj, filename):
         if os.path.exists(filename):
@@ -98,7 +98,7 @@ class ActorCriticModel(nn.Module):
         print("load model from file", filename)
         self.common = self._load(self.common, filename + ".common")
         self.actor = self._load(self.actor, filename + ".actor")
-        self.critic = self._load(self.critic, filename + ".value")
+        self.critic = self._load(self.critic, filename + ".critic")
 
 
 class PPOPolicy(LearningPolicy):
