@@ -1,10 +1,14 @@
+from pathlib import Path
+import sys
 import os
 import random
-import sys
+
+base_dir = Path(__file__).resolve().parent.parent
+sys.path.append(str(base_dir))
+
 from argparse import ArgumentParser, Namespace
 from collections import deque
 from datetime import datetime
-from pathlib import Path
 from pprint import pprint
 
 import numpy as np
@@ -25,9 +29,6 @@ from reinforcement_learning.ppo_agent import PPOPolicy
 from utils.agent_action_config import get_flatland_full_action_size, get_action_size, map_actions, map_action, \
     set_action_size_reduced, set_action_size_full, map_action_policy
 from utils.dead_lock_avoidance_agent import DeadLockAvoidanceAgent
-
-base_dir = Path(__file__).resolve().parent.parent
-sys.path.append(str(base_dir))
 
 from utils.timer import Timer
 from utils.observation_utils import normalize_observation
@@ -591,9 +592,9 @@ def eval_policy(env, tree_observation, policy, train_params, obs_params):
 
                             action = policy.act(agent, state_vector, eps=0.0)
                         else:
-                            agent_obs[agent_handle] = tree_observation.get_normalized_observation(obs[agent_handle],
-                                                                                                  observation_tree_depth,
-                                                                                                  observation_radius=observation_radius)
+                            agent_obs[agent] = tree_observation.get_normalized_observation(obs[agent],
+                                                                                           tree_depth,
+                                                                                           observation_radius=observation_radius)
                             action = policy.act(agent, agent_obs[agent], eps=0.0)
                 action_dict.update({agent: action})
             policy.end_step(train=False)
