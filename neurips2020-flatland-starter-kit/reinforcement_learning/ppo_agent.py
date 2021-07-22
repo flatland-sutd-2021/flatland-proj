@@ -147,7 +147,7 @@ class PPOPolicy(LearningPolicy):
         self.learning_rate_critic = self.learning_rate * 5
 
         self.optimizer = optim.Adam(
-            [{'params': self.actor_critic_model.common.parameters(), 'lr': self.learning_rate_actor}
+            [{'params': self.actor_critic_model.common.parameters(), 'lr': self.learning_rate_actor},
              {'params': self.actor_critic_model.actor.parameters(), 'lr': self.learning_rate_actor},
              {'params': self.actor_critic_model.critic.parameters(), 'lr': self.learning_rate_critic}]
         )
