@@ -268,7 +268,7 @@ class PPOPolicy(LearningPolicy):
                     # heuristic to penalize the gradient function when the policy becomes deterministic this would let
                     # the gradient becomes very flat and so the gradient is no longer useful.
                     loss = \
-                        -torch.min(surr1, surr2) \
+                        - torch.min(surr1, surr2) \
                         + self.weight_loss * self.loss_function(state_values, rewards) \
                         - self.weight_entropy * dist_entropy
 
@@ -278,7 +278,7 @@ class PPOPolicy(LearningPolicy):
                     self.optimizer.step()
 
                     # Transfer the current loss to the agents loss (information) for debug purpose only
-                    self.loss = loss.mean().detach().cpu().numpy()
+                    # self.loss = loss.mean().detach().cpu().numpy()
 
         # Reset all collect transition data
         self.current_episode_memory.reset()
