@@ -13,7 +13,7 @@ from pprint import pprint
 
 import numpy as np
 import psutil
-from flatland.envs.malfunction_generators import malfunction_from_params, MalfunctionParameters
+from flatland.envs.malfunction_generators import MalfunctionParameters, ParamMalfunctionGen
 from flatland.envs.observations import TreeObsForRailEnv
 from flatland.envs.predictions import ShortestPathPredictorForRailEnv
 from flatland.envs.rail_env import RailEnv, RailEnvActions
@@ -76,7 +76,7 @@ def create_rail_env(env_params, tree_observation):
         ),
         schedule_generator=sparse_schedule_generator(),
         number_of_agents=n_agents,
-        malfunction_generator_and_process_data=malfunction_from_params(malfunction_parameters),
+        malfunction_generator=ParamMalfunctionGen(malfunction_parameters),
         obs_builder_object=tree_observation,
         random_seed=seed
     )
@@ -442,6 +442,10 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
 
         # Print logs
         if episode_idx % checkpoint_interval == 0 and episode_idx > 0:
+            if not os.path.isdir("./checkpoints"):
+                print("MAKING CHECKPOINTS DIRECTORY")
+                os.mkdir("./checkpoints")
+
             policy.save('./checkpoints/' + training_id + '-' + str(episode_idx) + '.pth')
 
             if save_replay_buffer:
