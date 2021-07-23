@@ -77,6 +77,9 @@ def semi_normalise_tree_obs(env, obs, handle, num_agents_on_map):
         node = node[:-1]
 
     # Normalise
+    if num_agents_on_map == 0:
+        num_agents_on_map = 1
+
     node[7] = node[7] / num_agents_on_map
     node[8] = node[8] / num_agents_on_map
     node[11] = node[11] / env.number_of_agents
@@ -172,10 +175,13 @@ def get_self_extra_knn_states(env, handle,
         other_status = [0, 0, 0, 0]
         other_status[env.agents[other_handle].status] = 1
 
-        soft_priority = (
-            1 - (get_agent_target_distance(env, other_handle.squeeze())
-            / max_min_target_dist)
-        )
+        if max_min_target_dist == 0:
+            soft_priority = 0
+        else:
+            soft_priority = (
+                1 - (get_agent_target_distance(env, other_handle.squeeze())
+                / max_min_target_dist)
+            )
 
         # Populate state vector for kth nearest agent
         k_n_agent_state[kth_nearest_idx] = [

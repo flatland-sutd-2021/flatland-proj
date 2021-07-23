@@ -22,7 +22,7 @@ def get_agent_priority_naive(
     # predictions for the location of the agents
     # predictions[i] is an np array with shape (max_depth + 1, 3)
     # where the columns correspond to (time_offset, positon_axis_0, position_axis_1)
-    predictions = {i: predictor.get(i)[:, :3] for i in range(env.number_of_agents)}
+    predictions = {i: predictor.get(i).get(i)[:, :3] for i in range(env.number_of_agents)}
 
     # construct conflict graph
     for i in range(env.number_of_agents):
@@ -50,6 +50,9 @@ def get_agent_priority_naive(
 
     # get largest priority degree
     max_degree = max([d for _, d in priorities.items()])
+
+    if max_degree == 0:
+        max_degree = 1
 
     # normalize priority values
     normalized_priorities = [(p / max_degree) for p in priorities]

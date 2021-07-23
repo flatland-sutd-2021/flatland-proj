@@ -160,7 +160,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
         state_size = tree_observation.observation_dim
 
     if True:
-        state_size = 71 # CH3: CHANGE THIS ONCE STATE VECTOR IS FINALISED
+        state_size = 72 # CH3: CHANGE THIS ONCE STATE VECTOR IS FINALISED
 
     action_count = [0] * get_flatland_full_action_size()
     action_dict = dict()
@@ -296,7 +296,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                         # == ROOT EXTRA ==
                         train_env.number_of_agents,
                         *get_self_extra_states(train_env, obs, agent_handle),
-                        # priority,
+                        get_agent_priority_naive(train_env, predictor)[agent_handle],
                         0, # initial staticness is 0
                         *get_self_extra_knn_states(train_env, agent_handle, agent_handles, kd_tree, k_num=5),
 
@@ -349,7 +349,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                             # == ROOT EXTRA ==
                             train_env.number_of_agents,
                             *get_self_extra_states(train_env, obs, agent_handle),
-                            # priority,
+                            get_agent_priority_naive(train_env, predictor)[agent_handle],
                             reward_mod.stop_dict[agent_handle], # staticness
                             *get_self_extra_knn_states(train_env, agent_handle, agent_handles, kd_tree, k_num=5),
 
@@ -565,6 +565,8 @@ def eval_policy(env, tree_observation, policy, train_params, obs_params):
     tree_depth = obs_params.observation_tree_depth
     observation_radius = obs_params.observation_radius
 
+    predictor = ShortestPathPredictorForRailEnv(obs_params.observation_max_path_depth)
+
     action_dict = dict()
     scores = []
     completions = []
@@ -611,7 +613,7 @@ def eval_policy(env, tree_observation, policy, train_params, obs_params):
                                 # == ROOT EXTRA ==
                                 env.number_of_agents,
                                 *get_self_extra_states(env, obs, agent_handle),
-                                # priority,
+                                get_agent_priority_naive(env, predictor)[agent_handle],
                                 eval_mod.stop_dict[agent_handle], # staticness
                                 *get_self_extra_knn_states(env, agent_handle, agent_handles, kd_tree, k_num=5),
 
