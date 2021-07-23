@@ -171,6 +171,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
     smoothed_eval_completion = 0.0
 
     scores_window = deque(maxlen=checkpoint_interval)  # todo smooth when rendering instead
+    rewards_window = deque(maxlen=checkpoint_interval)  # todo smooth when rendering instead
     completion_window = deque(maxlen=checkpoint_interval)
 
     if train_params.action_size == "reduced":
@@ -266,6 +267,8 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
             env_renderer.set_new_rail()
 
         score = 0
+        reward_tracker = 0
+
         nb_steps = 0
         actions_taken = []
 
@@ -316,13 +319,9 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
         policy.start_episode(train=True)
 
         # hacked rewards object starts here
-        reward_mod = RewardModifier(train_env) 
-        
+        reward_mod = RewardModifier(train_env)
 
         for step in range(max_steps - 1):
-
-            
-
             inference_timer.start()
             policy.start_step(train=True)
 
@@ -376,32 +375,12 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
 
             # CH3: HACK REWARDS HERE
             if True:
-
-                
-
                 # Check if final step
                 if (step == max_steps -1):
                     final = True
-
                 else:
                     final = False
-
                 modded_rewards = reward_mod.check_rewards(train_env, all_rewards, final)
-                #reward_mod.print_rewards(modded_rewards)
-                
-
-                # SERIOUSLY UPDATE THEM!!!
-
-                # +10: Agent in target
-                # -0.35: Agent getting closer to target
-                # -0.5: Regular step
-                # -3: First Stopped count (and not done and not malfunctioning)
-                # -1: Stopped (and not done and not malfunctioning)
-                # -5: Stopping on switch
-                # -7: Not following priority ??
-                # -30: Deadlock (10 stop counts)
-                # -1000: Didn't finish on last step
-                # hacked_rewards = 0 # SOMETHING SOMETHING
 
             step_timer.end()
 
@@ -413,7 +392,6 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                     show_observations=False,
                     show_predictions=False
                 )
-
 
             # Update replay buffer and train agent
             for agent_handle in train_env.get_agent_handles():
@@ -444,6 +422,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                     preproc_timer.end()
 
                 score += all_rewards[agent_handle] # For evaluation only
+                reward_tracker += modded_rewards[agent_handle]
 
             nb_steps = step
 
@@ -457,12 +436,17 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
         # Collect information about training
         tasks_finished = sum(done[idx] for idx in train_env.get_agent_handles())
         completion = tasks_finished / max(1, train_env.get_num_agents())
-        normalized_score = score / (max_steps * train_env.get_num_agents())
-        action_probs = action_count / max(1, np.sum(action_count))
 
+        normalized_score = score / (max_steps * train_env.get_num_agents())
         scores_window.append(normalized_score)
-        completion_window.append(completion)
         smoothed_normalized_score = np.mean(scores_window)
+
+        normalized_rewards = reward_tracker / (max_steps * train_env.get_num_agents())
+        rewards_window.append(normalized_rewards)
+        smoothed_normalized_rewards = np.mean(rewards_window)
+
+        action_probs = action_count / max(1, np.sum(action_count))
+        completion_window.append(completion)
         smoothed_completion = np.mean(completion_window)
 
         if train_params.render:
@@ -484,17 +468,21 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
 
         print(
             '\r🚂 Episode {}'
-            '\t 🚉 nAgents {:2}/{:2}'
+            ' | 🚉 nAgents {:2}/{:2}'
             ' 🏆 Score: {:7.3f}'
             ' Avg: {:7.3f}'
-            '\t 💯 Done: {:6.2f}%'
+            ' Train Rewards: {:7.3f}'
+            ' Avg: {:7.3f}'
+            ' | 💯 Done: {:6.2f}%'
             ' Avg: {:6.2f}%'
-            '\t 🎲 Epsilon: {:.3f} '
-            '\t 🔀 Action Probs: {}'.format(
+            ' | 🎲 Epsilon: {:.3f} '
+            ' | 🔀 Action Probs: {}'.format(
                 episode_idx,
                 train_env_params.n_agents, number_of_agents,
                 normalized_score,
                 smoothed_normalized_score,
+                normalized_rewards,
+                smoothed_normalized_rewards,
                 100 * completion,
                 100 * smoothed_completion,
                 eps_start,
@@ -656,7 +644,7 @@ def eval_policy(env, tree_observation, policy, train_params, obs_params):
 
         nb_steps.append(final_step)
 
-    print(" ✅ Eval: score {:.3f} done {:.1f}%".format(np.mean(scores), np.mean(completions) * 100.0))
+    print(" ✅ Eval: score {:.3f} done {:.1f}%".format(np.mean(scores), np.mean(completions) * 100.0), flush=True)
 
     return scores, completions, nb_steps
 
