@@ -317,6 +317,8 @@ class PPOPolicy(LearningPolicy):
     def end_episode(self, train):
         if train:
             self.train_net()
+        else:
+            self.current_episode_memory.reset()
 
     # Checkpointing methods
     def save(self, filename):
