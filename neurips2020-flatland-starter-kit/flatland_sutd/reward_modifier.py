@@ -6,6 +6,7 @@ GET_CLOSER = -0.35
 GET_FURTHER = -0.5
 REACH_EARLY = 10
 FINAL_INCOMPLETE = -250
+STATICNESS = 10
 
 class RewardModifier:
 	def __init__ (self, train_env):
@@ -66,7 +67,7 @@ class RewardModifier:
 						self.reward_dict[handle] += STOP_LESS_TEN
 
 					# Heavily penalise deadlock
-					elif (self.stop_dict[handle] > 10):
+					elif (self.stop_dict[handle] > STATICNESS):
 						self.reward_dict[handle] += STOP_MORE_TEN
 			else:
 				self.stop_dict[handle] == 0
