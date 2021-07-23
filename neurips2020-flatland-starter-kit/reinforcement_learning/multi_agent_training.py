@@ -674,7 +674,7 @@ def eval_policy(env, tree_observation, policy, train_params, obs_params):
                                 env.number_of_agents,
                                 *get_self_extra_states(env, obs, agent),
                                 get_agent_priority_naive(env, predictor)[agent],
-                                reward_mod.stop_dict[agent], # staticness
+                                eval_mod.stop_dict[agent], # staticness
                                 *get_self_extra_knn_states(env, agent, agent_handles, kd_tree, k_num=5),
 
                                 # == RVNN CHILDREN ==

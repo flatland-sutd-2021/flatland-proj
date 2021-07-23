@@ -62,6 +62,8 @@ def get_valid_actions(env, handle):
         (i + 2 - direction) % 4 for i, x in enumerate(transitions) if x
     ])
 
+    valid_actions.add(4)
+
     return valid_actions
 
 
