@@ -1,10 +1,10 @@
 from .state_construction import *
 
 STOP_LESS_TEN = -1
-STOP_MORE_TEN = 10
+STOP_MORE_TEN = -10
 GET_CLOSER = -0.35
 GET_FURTHER = -0.5
-REACH_EARLY = 5
+REACH_EARLY = 10
 FINAL_INCOMPLETE = -250
 
 class RewardModifier:
