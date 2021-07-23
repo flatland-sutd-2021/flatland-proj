@@ -96,6 +96,8 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
         train_env_params.max_rails_between_cities = 2
         train_env_params.max_rails_in_city = 4
 
+        obs_params.observation_tree_depth = 4
+
     # Environment parameters
     n_agents = train_env_params.n_agents
     x_dim = train_env_params.x_dim
@@ -172,7 +174,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
         state_size = tree_observation.observation_dim
 
     if True:
-        state_size = 72 # CH3: CHANGE THIS ONCE STATE VECTOR IS FINALISED
+        state_size = 72 + 12 + 12 # CH3: CHANGE THIS ONCE STATE VECTOR IS FINALISED
 
     action_count = [0] * get_flatland_full_action_size()
     action_dict = dict()
@@ -271,7 +273,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                     eval_env = create_rail_env(train_env_params, tree_observation)
                     eval_env.reset(regenerate_schedule=True, regenerate_rail=True)
 
-                    print("\n\n== INCREMENTING DIFFICULTY ==")
+                    print(f"\n\n== INCREMENTING DIFFICULTY (Episode: {episode_idx}) ==")
                     train_env_params.n_agents += math.ceil(10**(len(str(train_env_params.n_agents))-1)*0.75)
                     train_env_params.n_cities = train_env_params.n_agents // 10 + 2
 
@@ -330,6 +332,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                 if True: # CH3: When it is time...
                     # NOTE: This bit might look unecessary, but it's actually
                     # needed to populate agent_prev_obs...
+                    rvnn_out = policy.rvnn(obs[agent_handle])
                     state_vector = [
                         # == ROOT ==
                         *semi_normalise_tree_obs(train_env, obs, agent_handle, num_agents_on_map),
@@ -338,14 +341,15 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                         train_env.number_of_agents,
                         *get_self_extra_states(train_env, obs, agent_handle),
                         get_agent_priority_naive(train_env, predictor)[agent_handle],
-                        0, # initial staticness is 0
+                        0, # staticness
                         *get_self_extra_knn_states(train_env, agent_handle, agent_handles, kd_tree, k_num=5),
 
                         # == RVNN CHILDREN ==
-                        # policy.rvnn(something)
+                        *rvnn_out
                     ]
 
                     # print("STATE VECTOR SIZE:", len(state_vector))
+                    # print(state_vector)
 
                     agent_obs[agent_handle] = state_vector # CH3: OBS HACK IS HERE!!!
                 else:
@@ -384,6 +388,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                 agent = train_env.agents[agent_handle]
                 if info['action_required'][agent_handle]:
                     if True: # CH3: When it is time...
+                        rvnn_out = policy.rvnn(obs[agent_handle])
                         state_vector = [
                             # == ROOT ==
                             *semi_normalise_tree_obs(train_env, obs, agent_handle, num_agents_on_map),
@@ -396,7 +401,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                             *get_self_extra_knn_states(train_env, agent_handle, agent_handles, kd_tree, k_num=5),
 
                             # == RVNN CHILDREN ==
-                            # policy.rvnn(something)
+                            *rvnn_out
                         ]
 
                         agent_obs[agent_handle] = state_vector # CH3: OBS HACK IS HERE!!!
@@ -542,7 +547,8 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
             ), end=" ", flush=True)
 
         # Evaluate policy and log results at some interval
-        if episode_idx % checkpoint_interval == 0 and n_eval_episodes > 100:
+        # Skip the first evaluation window
+        if episode_idx % checkpoint_interval == 0 and n_eval_episodes > 0 and episode_idx > 10:
             scores, completions, nb_steps_eval = eval_policy(eval_env,
                                                              tree_observation,
                                                              policy,
@@ -610,7 +616,7 @@ def format_action_prob(action_probs):
 
 
 def eval_policy(env, tree_observation, policy, train_params, obs_params):
-    print("")
+    print("", flush=True)
     n_eval_episodes = train_params.n_evaluation_episodes
     max_steps = env._max_episode_steps
     tree_depth = obs_params.observation_tree_depth
@@ -624,7 +630,7 @@ def eval_policy(env, tree_observation, policy, train_params, obs_params):
     nb_steps = []
 
     for episode_idx in range(n_eval_episodes):
-        print(f"\rEVALUATING POLICY: {episode_idx}/{n_eval_episodes}", end="")
+        print(f"\rEVALUATING POLICY: {episode_idx}/{n_eval_episodes}", end="", flush=True)
 
         agent_obs = [None] * env.get_num_agents()
         score = 0.0
@@ -659,19 +665,20 @@ def eval_policy(env, tree_observation, policy, train_params, obs_params):
                 if info['action_required'][agent]:
                     if True or tree_observation.check_is_observation_valid(agent_obs[agent]):
                         if True: # CH3: When it is time...
+                            rvnn_out = policy.rvnn(obs[agent])
                             state_vector = [
                                 # == ROOT ==
-                                *semi_normalise_tree_obs(env, obs, agent, num_agents_on_map),
+                                *semi_normalise_tree_obs(train_env, obs, agent_handle, num_agents_on_map),
 
                                 # == ROOT EXTRA ==
-                                env.number_of_agents,
-                                *get_self_extra_states(env, obs, agent),
-                                get_agent_priority_naive(env, predictor)[agent],
-                                eval_mod.stop_dict[agent], # staticness
-                                *get_self_extra_knn_states(env, agent, agent_handles, kd_tree, k_num=5),
+                                train_env.number_of_agents,
+                                *get_self_extra_states(train_env, obs, agent_handle),
+                                get_agent_priority_naive(train_env, predictor)[agent_handle],
+                                reward_mod.stop_dict[agent_handle], # staticness
+                                *get_self_extra_knn_states(train_env, agent_handle, agent_handles, kd_tree, k_num=5),
 
                                 # == RVNN CHILDREN ==
-                                # policy.rvnn(something)
+                                *rvnn_out
                             ]
 
                             action = policy.act(agent, state_vector, eps=0.0)
@@ -704,7 +711,7 @@ def eval_policy(env, tree_observation, policy, train_params, obs_params):
 
         nb_steps.append(final_step)
 
-    print("\n ✅ Eval: score {:.3f} done {:.1f}%\n".format(np.mean(scores), np.mean(completions) * 100.0), flush=True)
+    print("\n\n ✅ Eval: score {:.3f} done {:.1f}%\n".format(np.mean(scores), np.mean(completions) * 100.0), flush=True)
 
     return scores, completions, nb_steps
 

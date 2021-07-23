@@ -6,6 +6,16 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.distributions import Categorical
 
+from pathlib import Path
+import sys
+import random
+import math
+
+base_dir = Path(__file__).resolve().parent.parent
+sys.path.append(str(base_dir))
+
+from flatland_sutd import RvNN, tree_obs_expand
+
 # Hyperparameters
 from reinforcement_learning.policy import LearningPolicy
 from reinforcement_learning.replay_buffer import ReplayBuffer
@@ -156,11 +166,14 @@ class PPOPolicy(LearningPolicy):
                                                    hidsize1=self.hidsize,
                                                    hidsize2=self.hidsize)
 
+        self.rvnn_model = RvNN(24, 12, 12, tree_obs_expand, device=self.device)
+
         self.learning_rate_actor = self.learning_rate
         self.learning_rate_critic = self.learning_rate * 5
 
         self.optimizer = optim.Adam(
-            [{'params': self.actor_critic_model.common.parameters(), 'lr': self.learning_rate_actor},
+            [{'params': self.rvnn_model.parameters(), 'lr': self.learning_rate_critic},
+             {'params': self.actor_critic_model.common.parameters(), 'lr': self.learning_rate_actor},
              {'params': self.actor_critic_model.actor.parameters(), 'lr': self.learning_rate_actor},
              {'params': self.actor_critic_model.critic.parameters(), 'lr': self.learning_rate_critic}]
         )
@@ -168,6 +181,9 @@ class PPOPolicy(LearningPolicy):
 
     def reset(self, env):
         pass
+
+    def rvnn(self, node):
+        return self.rvnn_model(node)
 
     def act(self, handle, state, eps=None):
         # sample a action to take
@@ -305,6 +321,7 @@ class PPOPolicy(LearningPolicy):
         # print("Saving model from checkpoint:", filename)
         self.actor_critic_model.save(filename)
         torch.save(self.optimizer.state_dict(), filename + ".optimizer")
+        torch.save(self.rvnn_model.state_dict(), filename + ".rvnn")
 
     def _load(self, obj, filename):
         if os.path.exists(filename):
@@ -320,6 +337,8 @@ class PPOPolicy(LearningPolicy):
     def load(self, filename):
         print("load policy from file", filename)
         self.actor_critic_model.load(filename)
+        self.rvnn_model = self._load(self.rvnn_model, filename + ".rvnn")
+
         print("load optimizer from file", filename)
         self.optimizer = self._load(self.optimizer, filename + ".optimizer")
 
