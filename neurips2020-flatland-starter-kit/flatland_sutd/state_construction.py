@@ -184,14 +184,17 @@ def get_self_extra_knn_states(env, handle,
             )
 
         # Populate state vector for kth nearest agent
-        k_n_agent_state[kth_nearest_idx] = [
-            *other_status, # unpack list
-            env.agents[other_handle].malfunction_data['malfunction'],
-            env.agents[other_handle].speed_data['speed'],
-            other_pos[0] - agent_pos[0], # x distance
-            other_pos[1] - agent_pos[1], # y distance
-            soft_priority,
-        ]
+        try: # Just in case it over traverses the list
+            k_n_agent_state[kth_nearest_idx] = [
+                *other_status, # unpack list
+                env.agents[other_handle].malfunction_data['malfunction'],
+                env.agents[other_handle].speed_data['speed'],
+                other_pos[0] - agent_pos[0], # x distance
+                other_pos[1] - agent_pos[1], # y distance
+                soft_priority,
+            ]
+        except:
+            pass
 
     # Unpack the state vector
     k_n_agent_state_vector = [item for sublist in k_n_agent_state for item in sublist]

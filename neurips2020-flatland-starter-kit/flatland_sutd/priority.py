@@ -41,7 +41,7 @@ def get_agent_priority_naive(
 
             # if agent[i] and agent[j] are in the same predicted position at the same time
             for t in range(predictor.max_depth):
-                if predictions[i][t] == predictions[j][t]:
+                if np.array_equal(predictions[i][t], predictions[j][t]):
                     conflict_graph[i].add(j)
                     conflict_graph[j].add(i)
                     break
