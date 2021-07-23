@@ -43,22 +43,21 @@ class RewardModifier:
 
 		return distance_map[handle, position[0], position[1], direction]
 
-
 	def check_staticness(self, train_env):
 		cur_pos = self.get_agent_pos(train_env)
-
 
 		for handle in self.agent_list:
 			agent_status = train_env.agents[handle].status
 
 			if (agent_status != RailAgentStatus.DONE_REMOVED) and (agent_status != RailAgentStatus.DONE) and (train_env.agents[handle].malfunction_data['malfunction'] == 0):
 				if (cur_pos[handle] == self.prev_position[handle]):
-
 					self.stop_dict[handle] += 1
 
+				# Penalise stopping
 				if (self.stop_dict[handle] > 0) and (self.stop_dict[handle] < 10):
 					self.reward_dict[handle] -= 1
 
+				# Heavily penalise deadlock
 				elif (self.stop_dict[handle] > 10):
 					self.reward_dict[handle] -= 10
 			else:
@@ -83,21 +82,21 @@ class RewardModifier:
 				if dist < self.prev_distance[handle]:
 					self.reward_dict[handle] -= 0.35
 				elif dist > self.prev_distance[handle]:
-					self.reward_dict[handle] -= 0.75
+					self.reward_dict[handle] -= 0.5
+
+			# Reward reaching target sooner
+			if agent_status == RailAgentStatus.DONE_REMOVED:
+				self.reward_dict[handle] += 5
 
 		self.prev_distance = self.get_all_agent_dist(train_env)
-
 
 	def check_rewards(self, train_env, all_reward, final_check=False):
 		self.reset_rewards()
 		self.check_staticness(train_env)
-
 		self.check_step(train_env)
 
 		if final_check:
 			self.final_check(train_env)
-
-
 
 		return self.modify_rewards(all_reward)
 
@@ -115,7 +114,4 @@ class RewardModifier:
 			agent_status = train_env.agents[handle]
 
 			if (agent_status != RailAgentStatus.DONE_REMOVED) and (agent_status != RailAgentStatus.DONE):
-				self.reward_dict[handle] -= 100
-
-
-
+				self.reward_dict[handle] -= 250
