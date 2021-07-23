@@ -14,7 +14,7 @@ import math
 base_dir = Path(__file__).resolve().parent.parent
 sys.path.append(str(base_dir))
 
-from flatland_sutd import RvNN, tree_obs_expand
+from flatland_sutd import RvNN, tree_obs_expand, RAdam
 
 # Hyperparameters
 from reinforcement_learning.policy import LearningPolicy
@@ -171,7 +171,7 @@ class PPOPolicy(LearningPolicy):
         self.learning_rate_actor = self.learning_rate
         self.learning_rate_critic = self.learning_rate * 5
 
-        self.optimizer = optim.RMSprop(
+        self.optimizer = RAdam(
             [{'params': self.rvnn_model.parameters(), 'lr': self.learning_rate_critic},
              {'params': self.actor_critic_model.common.parameters(), 'lr': self.learning_rate_actor},
              {'params': self.actor_critic_model.actor.parameters(), 'lr': self.learning_rate_actor},
