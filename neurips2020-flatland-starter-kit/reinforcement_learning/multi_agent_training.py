@@ -80,8 +80,8 @@ def create_rail_env(env_params, tree_observation):
         schedule_generator=sparse_schedule_generator(),
         number_of_agents=n_agents,
         malfunction_generator=ParamMalfunctionGen(malfunction_parameters),
-        obs_builder_object=tree_observation,
-        random_seed=seed
+        obs_builder_object=tree_observation
+        # random_seed=seed
     )
 
 
