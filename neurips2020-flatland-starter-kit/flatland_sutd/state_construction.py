@@ -11,7 +11,7 @@ from sklearn.neighbors import KDTree
 
 import numpy as np
 import PIL
-
+import math
 
 # GENERAL UTILS=================================================================
 def get_agent_target_distance(env, handle):
@@ -84,6 +84,9 @@ def semi_normalise_tree_obs(env, obs, handle, num_agents_on_map):
     node[8] = node[8] / num_agents_on_map
     node[11] = node[11] / env.number_of_agents
 
+    if math.isinf(node[6]):
+        node[6] = 9999
+
     return node
 
 
@@ -96,7 +99,10 @@ def get_self_extra_states(env, obs, handle):
     for idx, action in enumerate(['F', 'L', 'R', 'B']):
         child_node = obs[handle].childs[action]
 
-        if child_node == float('-inf'):
+        if type(child_node) is float:
+            continue
+
+        if math.isinf(child_node.dist_min_to_target):
             continue
 
         action_state[idx] = child_node.dist_min_to_target

@@ -33,7 +33,6 @@ class EpisodeBuffers:
 
 
 class ActorCriticModel(nn.Module):
-
     def __init__(self, state_size, action_size, device, hidsize1=512, hidsize2=256):
         super(ActorCriticModel, self).__init__()
         self.device = device
@@ -64,14 +63,28 @@ class ActorCriticModel(nn.Module):
     def get_actor_dist(self, state):
         common_state = self.common(state)
         action_probs = self.actor(common_state)
-        dist = Categorical(action_probs)
+
+        try:
+            dist = Categorical(action_probs)
+        except Exception as e:
+            print(e)
+            print(action_probs)
+            print(state)
+            print(common_state)
+
         return dist
 
     def evaluate(self, states, actions):
         common_states = self.common(states)
-
         action_probs = self.actor(common_states)
-        dist = Categorical(action_probs)
+
+        try:
+            dist = Categorical(action_probs)
+        except Exception as e:
+            print(e)
+            print(action_probs)
+            print(states)
+
         action_logprobs = dist.log_prob(actions)
 
         dist_entropy = dist.entropy()
