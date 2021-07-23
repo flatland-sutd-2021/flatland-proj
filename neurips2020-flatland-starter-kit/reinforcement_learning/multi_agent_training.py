@@ -6,6 +6,8 @@ import random
 base_dir = Path(__file__).resolve().parent.parent
 sys.path.append(str(base_dir))
 
+from flatland_sutd import *
+
 from argparse import ArgumentParser, Namespace
 from collections import deque
 from datetime import datetime
@@ -13,7 +15,7 @@ from pprint import pprint
 
 import numpy as np
 import psutil
-from flatland.envs.malfunction_generators import malfunction_from_params, MalfunctionParameters
+from flatland.envs.malfunction_generators import MalfunctionParameters, ParamMalfunctionGen
 from flatland.envs.observations import TreeObsForRailEnv
 from flatland.envs.predictions import ShortestPathPredictorForRailEnv
 from flatland.envs.rail_env import RailEnv, RailEnvActions
@@ -76,7 +78,7 @@ def create_rail_env(env_params, tree_observation):
         ),
         schedule_generator=sparse_schedule_generator(),
         number_of_agents=n_agents,
-        malfunction_generator_and_process_data=malfunction_from_params(malfunction_parameters),
+        malfunction_generator=ParamMalfunctionGen(malfunction_parameters),
         obs_builder_object=tree_observation,
         random_seed=seed
     )
@@ -157,6 +159,9 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
         # Calculate the state size given the depth of the tree observation and the number of features
         state_size = tree_observation.observation_dim
 
+    if True:
+        state_size = 72 # CH3: CHANGE THIS ONCE STATE VECTOR IS FINALISED
+
     action_count = [0] * get_flatland_full_action_size()
     action_dict = dict()
     agent_obs = [None] * n_agents
@@ -169,6 +174,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
     smoothed_eval_completion = 0.0
 
     scores_window = deque(maxlen=checkpoint_interval)  # todo smooth when rendering instead
+    rewards_window = deque(maxlen=checkpoint_interval)  # todo smooth when rendering instead
     completion_window = deque(maxlen=checkpoint_interval)
 
     if train_params.action_size == "reduced":
@@ -250,6 +256,9 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
             number_of_agents = int(min(n_agents, 1 + np.floor(episode_idx / 200)))
             train_env_params.n_agents = episode_idx % number_of_agents + 1
 
+        if True: # CH3: DYNAMICALLY CHANGE ENV PARAMS HERE!!?!?!
+            pass
+
         train_env = create_rail_env(train_env_params, tree_observation)
         obs, info = train_env.reset(regenerate_rail=True, regenerate_schedule=True)
         policy.reset(train_env)
@@ -261,11 +270,13 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
             env_renderer.set_new_rail()
 
         score = 0
+        reward_tracker = 0
+
         nb_steps = 0
         actions_taken = []
 
         # Compute expensive stuff ONCE per step
-        if False: # CH3: Set to True when ready
+        if True: # CH3: Set to True when ready
             agent_positions, agent_handles = get_agent_positions(train_env)
             kd_tree = KDTree(agent_positions)
 
@@ -275,7 +286,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
         # Build initial agent-specific observations
         for agent_handle in train_env.get_agent_handles():
             if tree_observation.check_is_observation_valid(obs[agent_handle]):
-                if False: # CH3: When it is time...
+                if True: # CH3: When it is time...
                     # NOTE: This bit might look unecessary, but it's actually
                     # needed to populate agent_prev_obs...
                     state_vector = [
@@ -284,14 +295,16 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
 
                         # == ROOT EXTRA ==
                         train_env.number_of_agents,
-                        *get_self_extra_states(env, obs, agent_handle),
-                        # priority,
-                        # staticness,
+                        *get_self_extra_states(train_env, obs, agent_handle),
+                        get_agent_priority_naive(train_env, predictor)[agent_handle],
+                        0, # initial staticness is 0
                         *get_self_extra_knn_states(train_env, agent_handle, agent_handles, kd_tree, k_num=5),
 
                         # == RVNN CHILDREN ==
                         # policy.rvnn(something)
                     ]
+
+                    # print("STATE VECTOR SIZE:", len(state_vector))
 
                     agent_obs[agent_handle] = state_vector # CH3: OBS HACK IS HERE!!!
                 else:
@@ -303,19 +316,23 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
 
         # Max number of steps per episode
         # This is the official formula used during evaluations
-        # See details in flatland.envs.schedule_generators.sparse_schedule_generator
+        # See details in flatland.envs.schedule_generfators.sparse_schedule_generator
         # max_steps = int(4 * 2 * (env.height + env.width + (n_agents / n_cities)))
         max_steps = train_env._max_episode_steps
 
         # Run episode
         policy.start_episode(train=True)
 
+        # hacked rewards object starts here
+        reward_mod = RewardModifier(train_env)
+        valid_action_penalties = {}
+
         for step in range(max_steps - 1):
             inference_timer.start()
             policy.start_step(train=True)
 
             # Compute expensive stuff ONCE per step
-            if False: # CH3: Set to True when ready
+            if True: # CH3: Set to True when ready
                 agent_positions, agent_handles = get_agent_positions(train_env)
                 kd_tree = KDTree(agent_positions)
 
@@ -325,16 +342,16 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
             for agent_handle in train_env.get_agent_handles():
                 agent = train_env.agents[agent_handle]
                 if info['action_required'][agent_handle]:
-                    if False: # CH3: When it is time...
+                    if True: # CH3: When it is time...
                         state_vector = [
                             # == ROOT ==
                             *semi_normalise_tree_obs(train_env, obs, agent_handle, num_agents_on_map),
 
                             # == ROOT EXTRA ==
                             train_env.number_of_agents,
-                            *get_self_extra_states(env, obs, agent_handle),
-                            # priority,
-                            # staticness,
+                            *get_self_extra_states(train_env, obs, agent_handle),
+                            get_agent_priority_naive(train_env, predictor)[agent_handle],
+                            reward_mod.stop_dict[agent_handle], # staticness
                             *get_self_extra_knn_states(train_env, agent_handle, agent_handles, kd_tree, k_num=5),
 
                             # == RVNN CHILDREN ==
@@ -345,6 +362,12 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
 
                     update_values[agent_handle] = True
                     action = policy.act(agent_handle, agent_obs[agent_handle], eps=eps_start)
+
+                    if action not in get_valid_actions(train_env, agent_handle):
+                        valid_action_penalties[agent_handle] = -10
+                    else:
+                        valid_action_penalties[agent_handle] = 0
+
                     action_count[map_action(action)] += 1
                     actions_taken.append(map_action(action))
                 else:
@@ -362,19 +385,13 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
             next_obs, all_rewards, done, info = train_env.step(map_actions(action_dict))
 
             # CH3: HACK REWARDS HERE
-            if False:
-                # SERIOUSLY UPDATE THEM!!!
-
-                # +10: Agent in target
-                # -0.35: Agent getting closer to target
-                # -0.5: Regular step
-                # -3: First Stopped count (and not done and not malfunctioning)
-                # -1: Stopped (and not done and not malfunctioning)
-                # -5: Stopping on switch
-                # -7: Not following priority ??
-                # -30: Deadlock (10 stop counts)
-                # -1000: Didn't finish on last step
-                hacked_rewards = 0 # SOMETHING SOMETHING
+            if True:
+                # Check if final step
+                if (step == max_steps -1):
+                    final = True
+                else:
+                    final = False
+                modded_rewards = reward_mod.check_rewards(train_env, all_rewards, final)
 
             step_timer.end()
 
@@ -395,7 +412,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                     policy.step(agent_handle,
                                 agent_prev_obs[agent_handle],
                                 map_action_policy(agent_prev_action[agent_handle]),
-                                all_rewards[agent_handle], # CH3: HACK REWARDS HERE, DON'T USE ALL_REWARDS
+                                modded_rewards[agent_handle] + valid_action_penalties[agent_handle], # CH3: HACK REWARDS HERE, DON'T USE ALL_REWARDS
                                 agent_obs[agent_handle],
                                 done[agent_handle])
                     learn_timer.end()
@@ -407,7 +424,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                 if tree_observation.check_is_observation_valid(next_obs[agent_handle]):
                     preproc_timer.start()
 
-                    if False: # CH3: When it's time...
+                    if True: # CH3: When it's time...
                         pass # Yep, because we do this step ontop
                     else:
                         agent_obs[agent_handle] = tree_observation.get_normalized_observation(next_obs[agent_handle],
@@ -416,6 +433,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                     preproc_timer.end()
 
                 score += all_rewards[agent_handle] # For evaluation only
+                reward_tracker += modded_rewards[agent_handle]
 
             nb_steps = step
 
@@ -429,12 +447,17 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
         # Collect information about training
         tasks_finished = sum(done[idx] for idx in train_env.get_agent_handles())
         completion = tasks_finished / max(1, train_env.get_num_agents())
-        normalized_score = score / (max_steps * train_env.get_num_agents())
-        action_probs = action_count / max(1, np.sum(action_count))
 
+        normalized_score = score / (max_steps * train_env.get_num_agents())
         scores_window.append(normalized_score)
-        completion_window.append(completion)
         smoothed_normalized_score = np.mean(scores_window)
+
+        normalized_rewards = reward_tracker / (max_steps * train_env.get_num_agents())
+        rewards_window.append(normalized_rewards)
+        smoothed_normalized_rewards = np.mean(rewards_window)
+
+        action_probs = action_count / max(1, np.sum(action_count))
+        completion_window.append(completion)
         smoothed_completion = np.mean(completion_window)
 
         if train_params.render:
@@ -442,6 +465,10 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
 
         # Print logs
         if episode_idx % checkpoint_interval == 0 and episode_idx > 0:
+            if not os.path.isdir("./checkpoints"):
+                print("MAKING CHECKPOINTS DIRECTORY")
+                os.mkdir("./checkpoints")
+
             policy.save('./checkpoints/' + training_id + '-' + str(episode_idx) + '.pth')
 
             if save_replay_buffer:
@@ -452,22 +479,26 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
 
         print(
             '\r🚂 Episode {}'
-            '\t 🚉 nAgents {:2}/{:2}'
+            ' | 🚉 nAgents {:2}/{:2}'
             ' 🏆 Score: {:7.3f}'
             ' Avg: {:7.3f}'
-            '\t 💯 Done: {:6.2f}%'
+            ' Train Rewards: {:7.3f}'
+            ' Avg: {:7.3f}'
+            ' | 💯 Done: {:6.2f}%'
             ' Avg: {:6.2f}%'
-            '\t 🎲 Epsilon: {:.3f} '
-            '\t 🔀 Action Probs: {}'.format(
+            ' | 🎲 Epsilon: {:.3f} '
+            ' | 🔀 Action Probs: {}'.format(
                 episode_idx,
                 train_env_params.n_agents, number_of_agents,
                 normalized_score,
                 smoothed_normalized_score,
+                normalized_rewards,
+                smoothed_normalized_rewards,
                 100 * completion,
                 100 * smoothed_completion,
                 eps_start,
                 format_action_prob(action_probs)
-            ), end=" ")
+            ), end=" ", flush=True)
 
         # Evaluate policy and log results at some interval
         if episode_idx % checkpoint_interval == 0 and n_eval_episodes > 0:
@@ -541,6 +572,8 @@ def eval_policy(env, tree_observation, policy, train_params, obs_params):
     tree_depth = obs_params.observation_tree_depth
     observation_radius = obs_params.observation_radius
 
+    predictor = ShortestPathPredictorForRailEnv(obs_params.observation_max_path_depth)
+
     action_dict = dict()
     scores = []
     completions = []
@@ -555,16 +588,21 @@ def eval_policy(env, tree_observation, policy, train_params, obs_params):
         final_step = 0
 
         policy.start_episode(train=False)
+
+        # create reward modifier for the purposes of tracking stops
+        eval_mod = RewardModifier(env)
         for step in range(max_steps - 1):
             policy.start_step(train=False)
 
+            eval_mod.check_staticness(env)
+
             # Compute expensive stuff ONCE per step
-            if False: # CH3: Set to True when ready
-                agent_positions, agent_handles = get_agent_positions(train_env)
+            if True: # CH3: Set to True when ready
+                agent_positions, agent_handles = get_agent_positions(env)
                 kd_tree = KDTree(agent_positions)
 
                 # This is -NOT- total agent count or active agent count!
-                num_agents_on_map = get_num_agents_on_map(train_env)
+                num_agents_on_map = get_num_agents_on_map(env)
 
             for agent in env.get_agent_handles():
                 if tree_observation.check_is_observation_valid(agent_obs[agent]):
@@ -574,17 +612,17 @@ def eval_policy(env, tree_observation, policy, train_params, obs_params):
                 action = 0
                 if info['action_required'][agent]:
                     if tree_observation.check_is_observation_valid(agent_obs[agent]):
-                        if False: # CH3: When it is time...
+                        if True: # CH3: When it is time...
                             state_vector = [
                                 # == ROOT ==
-                                *semi_normalise_tree_obs(train_env, obs, agent_handle, num_agents_on_map),
+                                *semi_normalise_tree_obs(env, obs, agent_handle, num_agents_on_map),
 
                                 # == ROOT EXTRA ==
-                                train_env.number_of_agents,
+                                env.number_of_agents,
                                 *get_self_extra_states(env, obs, agent_handle),
-                                # priority,
-                                # staticness,
-                                *get_self_extra_knn_states(train_env, agent_handle, agent_handles, kd_tree, k_num=5),
+                                get_agent_priority_naive(env, predictor)[agent_handle],
+                                eval_mod.stop_dict[agent_handle], # staticness
+                                *get_self_extra_knn_states(env, agent_handle, agent_handles, kd_tree, k_num=5),
 
                                 # == RVNN CHILDREN ==
                                 # policy.rvnn(something)
@@ -619,7 +657,7 @@ def eval_policy(env, tree_observation, policy, train_params, obs_params):
 
         nb_steps.append(final_step)
 
-    print(" ✅ Eval: score {:.3f} done {:.1f}%".format(np.mean(scores), np.mean(completions) * 100.0))
+    print(" ✅ Eval: score {:.3f} done {:.1f}%".format(np.mean(scores), np.mean(completions) * 100.0), flush=True)
 
     return scores, completions, nb_steps
 

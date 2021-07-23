@@ -37,19 +37,23 @@ class ActorCriticModel(nn.Module):
     def __init__(self, state_size, action_size, device, hidsize1=512, hidsize2=256):
         super(ActorCriticModel, self).__init__()
         self.device = device
-        self.actor = nn.Sequential(
+
+        self.common = nn.Sequential(
             nn.Linear(state_size, hidsize1),
-            nn.Tanh(),
+            nn.PReLU(),
             nn.Linear(hidsize1, hidsize2),
+            nn.Tanh(),
+        ).to(self.device)
+
+        self.actor = nn.Sequential(
+            nn.Linear(hidsize2, hidsize2),
             nn.Tanh(),
             nn.Linear(hidsize2, action_size),
             nn.Softmax(dim=-1)
         ).to(self.device)
 
         self.critic = nn.Sequential(
-            nn.Linear(state_size, hidsize1),
-            nn.Tanh(),
-            nn.Linear(hidsize1, hidsize2),
+            nn.Linear(hidsize2, hidsize2),
             nn.Tanh(),
             nn.Linear(hidsize2, 1)
         ).to(self.device)
@@ -58,22 +62,28 @@ class ActorCriticModel(nn.Module):
         raise NotImplementedError
 
     def get_actor_dist(self, state):
-        action_probs = self.actor(state)
+        common_state = self.common(state)
+        action_probs = self.actor(common_state)
         dist = Categorical(action_probs)
         return dist
 
     def evaluate(self, states, actions):
-        action_probs = self.actor(states)
+        common_states = self.common(states)
+
+        action_probs = self.actor(common_states)
         dist = Categorical(action_probs)
         action_logprobs = dist.log_prob(actions)
+
         dist_entropy = dist.entropy()
-        state_value = self.critic(states)
+        state_value = self.critic(common_states)
+
         return action_logprobs, torch.squeeze(state_value), dist_entropy
 
     def save(self, filename):
-        # print("Saving model from checkpoint:", filename)
+        print("Saving model from checkpoint:", filename)
+        torch.save(self.common.state_dict(), filename + ".common")
         torch.save(self.actor.state_dict(), filename + ".actor")
-        torch.save(self.critic.state_dict(), filename + ".value")
+        torch.save(self.critic.state_dict(), filename + ".critic")
 
     def _load(self, obj, filename):
         if os.path.exists(filename):
@@ -86,8 +96,9 @@ class ActorCriticModel(nn.Module):
 
     def load(self, filename):
         print("load model from file", filename)
+        self.common = self._load(self.common, filename + ".common")
         self.actor = self._load(self.actor, filename + ".actor")
-        self.critic = self._load(self.critic, filename + ".value")
+        self.critic = self._load(self.critic, filename + ".critic")
 
 
 class PPOPolicy(LearningPolicy):
@@ -112,13 +123,13 @@ class PPOPolicy(LearningPolicy):
         else:
             self.hidsize = 128
             self.learning_rate = 1.0e-3
-            self.gamma = 0.95
+            self.gamma = 0.99
             self.buffer_size = 32_000
             self.batch_size = 1024
             self.device = torch.device("cpu")
 
-        self.surrogate_eps_clip = 0.1
-        self.K_epoch = 10
+        self.surrogate_eps_clip = 0.2
+        self.K_epoch = 40
         self.weight_loss = 0.5
         self.weight_entropy = 0.01
 
@@ -131,7 +142,15 @@ class PPOPolicy(LearningPolicy):
         self.actor_critic_model = ActorCriticModel(state_size, action_size,self.device,
                                                    hidsize1=self.hidsize,
                                                    hidsize2=self.hidsize)
-        self.optimizer = optim.Adam(self.actor_critic_model.parameters(), lr=self.learning_rate)
+
+        self.learning_rate_actor = self.learning_rate
+        self.learning_rate_critic = self.learning_rate * 5
+
+        self.optimizer = optim.Adam(
+            [{'params': self.actor_critic_model.common.parameters(), 'lr': self.learning_rate_actor},
+             {'params': self.actor_critic_model.actor.parameters(), 'lr': self.learning_rate_actor},
+             {'params': self.actor_critic_model.critic.parameters(), 'lr': self.learning_rate_critic}]
+        )
         self.loss_function = nn.MSELoss()  # nn.SmoothL1Loss()
 
     def reset(self, env):
@@ -181,13 +200,10 @@ class PPOPolicy(LearningPolicy):
 
             state_list.insert(0, state_i)
             action_list.insert(0, action_i)
-            if done_i:
-                discounted_reward = 0
-                done_list.insert(0, 1)
-            else:
-                done_list.insert(0, 0)
+            done_list.insert(0, int(done_i))
 
-            discounted_reward = reward_i + self.gamma * discounted_reward
+            discounted_reward = reward_i + self.gamma * discounted_reward * (1.0-int(done_i))
+
             reward_list.insert(0, discounted_reward)
             state_next_list.insert(0, state_next_i)
             prob_a_list.insert(0, prob_action_i)
@@ -252,7 +268,7 @@ class PPOPolicy(LearningPolicy):
                     # heuristic to penalize the gradient function when the policy becomes deterministic this would let
                     # the gradient becomes very flat and so the gradient is no longer useful.
                     loss = \
-                        -torch.min(surr1, surr2) \
+                        - torch.min(surr1, surr2) \
                         + self.weight_loss * self.loss_function(state_values, rewards) \
                         - self.weight_entropy * dist_entropy
 
