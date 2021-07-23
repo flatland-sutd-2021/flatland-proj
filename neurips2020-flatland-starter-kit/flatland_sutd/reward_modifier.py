@@ -1,5 +1,12 @@
 from .state_construction import *
 
+STOP_LESS_TEN = -1
+STOP_MORE_TEN = 10
+GET_CLOSER = -0.35
+GET_FURTHER = -0.5
+REACH_EARLY = 5
+FINAL_INCOMPLETE = -250
+
 class RewardModifier:
 	def __init__ (self, train_env):
 		agent_handles = train_env.get_agent_handles()
@@ -49,20 +56,21 @@ class RewardModifier:
 		for handle in self.agent_list:
 			agent_status = train_env.agents[handle].status
 
-			if (agent_status != RailAgentStatus.DONE_REMOVED) and (agent_status != RailAgentStatus.DONE) and (train_env.agents[handle].malfunction_data['malfunction'] == 0):
-				if (cur_pos[handle] == self.prev_position[handle]):
-					self.stop_dict[handle] += 1
+			if (agent_status != RailAgentStatus.DONE_REMOVED) and (agent_status != RailAgentStatus.DONE):
+				if(train_env.agents[handle].malfunction_data['malfunction'] == 0):
+					if (cur_pos[handle] == self.prev_position[handle]):
+						self.stop_dict[handle] += 1
 
-				# Penalise stopping
-				if (self.stop_dict[handle] > 0) and (self.stop_dict[handle] < 10):
-					self.reward_dict[handle] -= 1
+					# Penalise stopping
+					if (self.stop_dict[handle] > 0) and (self.stop_dict[handle] < 10):
+						self.reward_dict[handle] += STOP_LESS_TEN
 
-				# Heavily penalise deadlock
-				elif (self.stop_dict[handle] > 10):
-					self.reward_dict[handle] -= 10
+					# Heavily penalise deadlock
+					elif (self.stop_dict[handle] > 10):
+						self.reward_dict[handle] += STOP_MORE_TEN
 			else:
 				self.stop_dict[handle] == 0
-				self.reward_dict[handle] += 10
+				self.reward_dict[handle] += REACH_EARLY
 
 		self.prev_position = cur_pos
 
@@ -80,13 +88,13 @@ class RewardModifier:
 				dist = self.get_agent_dist(train_env, handle)
 
 				if dist < self.prev_distance[handle]:
-					self.reward_dict[handle] -= 0.35
+					self.reward_dict[handle] += GET_CLOSER
 				elif dist > self.prev_distance[handle]:
-					self.reward_dict[handle] -= 0.5
+					self.reward_dict[handle] += GET_FURTHER
 
-			# Reward reaching target sooner
-			if agent_status == RailAgentStatus.DONE_REMOVED:
-				self.reward_dict[handle] += 5
+			# # Reward reaching target sooner
+			# if agent_status == RailAgentStatus.DONE_REMOVED:
+			# 	self.reward_dict[handle] += 5
 
 		self.prev_distance = self.get_all_agent_dist(train_env)
 
@@ -114,6 +122,6 @@ class RewardModifier:
 			agent_status = train_env.agents[handle]
 
 			if (agent_status != RailAgentStatus.DONE_REMOVED) and (agent_status != RailAgentStatus.DONE):
-				self.reward_dict[handle] -= 250
+				self.reward_dict[handle] += FINAL_INCOMPLETE
 
 # NOTE: Penalty for valid actions is DONE IN AN OUTER LOOP
