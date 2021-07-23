@@ -1,15 +1,19 @@
+from pathlib import Path
+import sys
 import os
 import random
-import sys
+
+base_dir = Path(__file__).resolve().parent.parent
+sys.path.append(str(base_dir))
+
 from argparse import ArgumentParser, Namespace
 from collections import deque
 from datetime import datetime
-from pathlib import Path
 from pprint import pprint
 
 import numpy as np
 import psutil
-from flatland.envs.malfunction_generators import malfunction_from_params, MalfunctionParameters
+from flatland.envs.malfunction_generators import MalfunctionParameters, ParamMalfunctionGen
 from flatland.envs.observations import TreeObsForRailEnv
 from flatland.envs.predictions import ShortestPathPredictorForRailEnv
 from flatland.envs.rail_env import RailEnv, RailEnvActions
@@ -25,9 +29,6 @@ from reinforcement_learning.ppo_agent import PPOPolicy
 from utils.agent_action_config import get_flatland_full_action_size, get_action_size, map_actions, map_action, \
     set_action_size_reduced, set_action_size_full, map_action_policy
 from utils.dead_lock_avoidance_agent import DeadLockAvoidanceAgent
-
-base_dir = Path(__file__).resolve().parent.parent
-sys.path.append(str(base_dir))
 
 from utils.timer import Timer
 from utils.observation_utils import normalize_observation
@@ -75,7 +76,7 @@ def create_rail_env(env_params, tree_observation):
         ),
         schedule_generator=sparse_schedule_generator(),
         number_of_agents=n_agents,
-        malfunction_generator_and_process_data=malfunction_from_params(malfunction_parameters),
+        malfunction_generator=ParamMalfunctionGen(malfunction_parameters),
         obs_builder_object=tree_observation,
         random_seed=seed
     )
@@ -249,6 +250,9 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
             number_of_agents = int(min(n_agents, 1 + np.floor(episode_idx / 200)))
             train_env_params.n_agents = episode_idx % number_of_agents + 1
 
+        if False: # CH3: DYNAMICALLY CHANGE ENV PARAMS HERE!!?!?!
+            pass
+
         train_env = create_rail_env(train_env_params, tree_observation)
         obs, info = train_env.reset(regenerate_rail=True, regenerate_schedule=True)
         policy.reset(train_env)
@@ -263,13 +267,20 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
         nb_steps = 0
         actions_taken = []
 
+        # Compute expensive stuff ONCE per step
+        if False: # CH3: Set to True when ready
+            agent_positions, agent_handles = get_agent_positions(train_env)
+            kd_tree = KDTree(agent_positions)
+
+            # This is -NOT- total agent count or active agent count!
+            num_agents_on_map = get_num_agents_on_map(train_env)
+
         # Build initial agent-specific observations
         for agent_handle in train_env.get_agent_handles():
             if tree_observation.check_is_observation_valid(obs[agent_handle]):
                 if False: # CH3: When it is time...
                     # NOTE: This bit might look unecessary, but it's actually
                     # needed to populate agent_prev_obs...
-
                     state_vector = [
                         # == ROOT ==
                         *semi_normalise_tree_obs(train_env, obs, agent_handle, num_agents_on_map),
@@ -434,6 +445,10 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
 
         # Print logs
         if episode_idx % checkpoint_interval == 0 and episode_idx > 0:
+            if not os.path.isdir("./checkpoints"):
+                print("MAKING CHECKPOINTS DIRECTORY")
+                os.mkdir("./checkpoints")
+
             policy.save('./checkpoints/' + training_id + '-' + str(episode_idx) + '.pth')
 
             if save_replay_buffer:
@@ -459,7 +474,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                 100 * smoothed_completion,
                 eps_start,
                 format_action_prob(action_probs)
-            ), end=" ")
+            ), end=" ", flush=True)
 
         # Evaluate policy and log results at some interval
         if episode_idx % checkpoint_interval == 0 and n_eval_episodes > 0:
@@ -584,9 +599,9 @@ def eval_policy(env, tree_observation, policy, train_params, obs_params):
 
                             action = policy.act(agent, state_vector, eps=0.0)
                         else:
-                            agent_obs[agent_handle] = tree_observation.get_normalized_observation(obs[agent_handle],
-                                                                                                  observation_tree_depth,
-                                                                                                  observation_radius=observation_radius)
+                            agent_obs[agent] = tree_observation.get_normalized_observation(obs[agent],
+                                                                                           tree_depth,
+                                                                                           observation_radius=observation_radius)
                             action = policy.act(agent, agent_obs[agent], eps=0.0)
                 action_dict.update({agent: action})
             policy.end_step(train=False)

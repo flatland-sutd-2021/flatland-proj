@@ -83,7 +83,7 @@ class ActorCriticModel(nn.Module):
         print("Saving model from checkpoint:", filename)
         torch.save(self.common.state_dict(), filename + ".common")
         torch.save(self.actor.state_dict(), filename + ".actor")
-        torch.save(self.critic.state_dict(), filename + ".value")
+        torch.save(self.critic.state_dict(), filename + ".critic")
 
     def _load(self, obj, filename):
         if os.path.exists(filename):
@@ -98,7 +98,7 @@ class ActorCriticModel(nn.Module):
         print("load model from file", filename)
         self.common = self._load(self.common, filename + ".common")
         self.actor = self._load(self.actor, filename + ".actor")
-        self.critic = self._load(self.critic, filename + ".value")
+        self.critic = self._load(self.critic, filename + ".critic")
 
 
 class PPOPolicy(LearningPolicy):
@@ -147,7 +147,7 @@ class PPOPolicy(LearningPolicy):
         self.learning_rate_critic = self.learning_rate * 5
 
         self.optimizer = optim.Adam(
-            [{'params': self.actor_critic_model.common.parameters(), 'lr': self.learning_rate_actor}
+            [{'params': self.actor_critic_model.common.parameters(), 'lr': self.learning_rate_actor},
              {'params': self.actor_critic_model.actor.parameters(), 'lr': self.learning_rate_actor},
              {'params': self.actor_critic_model.critic.parameters(), 'lr': self.learning_rate_critic}]
         )
