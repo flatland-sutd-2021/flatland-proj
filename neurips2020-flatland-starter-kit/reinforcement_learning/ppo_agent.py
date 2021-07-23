@@ -49,7 +49,7 @@ class ActorCriticModel(nn.Module):
 
         self.common = nn.Sequential(
             nn.Linear(state_size, hidsize1),
-            nn.PReLU(),
+            nn.Tanh(),
             nn.Linear(hidsize1, hidsize2),
             nn.Tanh(),
         ).to(self.device)
