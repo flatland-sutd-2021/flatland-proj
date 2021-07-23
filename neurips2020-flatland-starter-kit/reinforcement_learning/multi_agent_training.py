@@ -6,6 +6,8 @@ import random
 base_dir = Path(__file__).resolve().parent.parent
 sys.path.append(str(base_dir))
 
+from flatland_sutd import *
+
 from argparse import ArgumentParser, Namespace
 from collections import deque
 from datetime import datetime
@@ -289,7 +291,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                         train_env.number_of_agents,
                         *get_self_extra_states(env, obs, agent_handle),
                         # priority,
-                        # staticness,
+                        0, # initial staticness is 0
                         *get_self_extra_knn_states(train_env, agent_handle, agent_handles, kd_tree, k_num=5),
 
                         # == RVNN CHILDREN ==
@@ -306,14 +308,21 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
 
         # Max number of steps per episode
         # This is the official formula used during evaluations
-        # See details in flatland.envs.schedule_generators.sparse_schedule_generator
+        # See details in flatland.envs.schedule_generfators.sparse_schedule_generator
         # max_steps = int(4 * 2 * (env.height + env.width + (n_agents / n_cities)))
         max_steps = train_env._max_episode_steps
 
         # Run episode
         policy.start_episode(train=True)
 
+        # hacked rewards object starts here
+        reward_mod = RewardModifier(train_env) 
+        
+
         for step in range(max_steps - 1):
+
+            
+
             inference_timer.start()
             policy.start_step(train=True)
 
@@ -337,7 +346,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                             train_env.number_of_agents,
                             *get_self_extra_states(env, obs, agent_handle),
                             # priority,
-                            # staticness,
+                            reward_mod.stop_dict[agent_handle], # staticness
                             *get_self_extra_knn_states(train_env, agent_handle, agent_handles, kd_tree, k_num=5),
 
                             # == RVNN CHILDREN ==
@@ -364,8 +373,23 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
             step_timer.start()
             next_obs, all_rewards, done, info = train_env.step(map_actions(action_dict))
 
+
             # CH3: HACK REWARDS HERE
-            if False:
+            if True:
+
+                
+
+                # Check if final step
+                if (step == max_steps -1):
+                    final = True
+
+                else:
+                    final = False
+
+                modded_rewards = reward_mod.check_rewards(train_env, all_rewards, final)
+                #reward_mod.print_rewards(modded_rewards)
+                
+
                 # SERIOUSLY UPDATE THEM!!!
 
                 # +10: Agent in target
@@ -377,7 +401,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                 # -7: Not following priority ??
                 # -30: Deadlock (10 stop counts)
                 # -1000: Didn't finish on last step
-                hacked_rewards = 0 # SOMETHING SOMETHING
+                # hacked_rewards = 0 # SOMETHING SOMETHING
 
             step_timer.end()
 
@@ -390,6 +414,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                     show_predictions=False
                 )
 
+
             # Update replay buffer and train agent
             for agent_handle in train_env.get_agent_handles():
                 if update_values[agent_handle] or done['__all__']:
@@ -398,7 +423,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                     policy.step(agent_handle,
                                 agent_prev_obs[agent_handle],
                                 map_action_policy(agent_prev_action[agent_handle]),
-                                all_rewards[agent_handle], # CH3: HACK REWARDS HERE, DON'T USE ALL_REWARDS
+                                modded_rewards[agent_handle], # CH3: HACK REWARDS HERE, DON'T USE ALL_REWARDS
                                 agent_obs[agent_handle],
                                 done[agent_handle])
                     learn_timer.end()
@@ -562,8 +587,13 @@ def eval_policy(env, tree_observation, policy, train_params, obs_params):
         final_step = 0
 
         policy.start_episode(train=False)
+
+        # create reward modifier for the purposes of tracking stops
+        eval_mod = RewardModifier(env)
         for step in range(max_steps - 1):
             policy.start_step(train=False)
+
+            eval_mod.check_staticness(env)
 
             # Compute expensive stuff ONCE per step
             if False: # CH3: Set to True when ready
@@ -590,7 +620,7 @@ def eval_policy(env, tree_observation, policy, train_params, obs_params):
                                 train_env.number_of_agents,
                                 *get_self_extra_states(env, obs, agent_handle),
                                 # priority,
-                                # staticness,
+                                eval_mod.stop_dict[agent_handle], # staticness
                                 *get_self_extra_knn_states(train_env, agent_handle, agent_handles, kd_tree, k_num=5),
 
                                 # == RVNN CHILDREN ==
