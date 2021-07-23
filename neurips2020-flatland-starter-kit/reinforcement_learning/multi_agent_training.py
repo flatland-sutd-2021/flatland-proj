@@ -575,6 +575,8 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
         # Save logs to tensorboard
         writer.add_scalar("training/score", normalized_score, episode_idx)
         writer.add_scalar("training/smoothed_score", smoothed_normalized_score, episode_idx)
+        writer.add_scalar("training/rewards", normalized_rewards, episode_idx)
+        writer.add_scalar("training/smoothed_rewards", smoothed_normalized_rewards, episode_idx)
         writer.add_scalar("training/completion", np.mean(completion), episode_idx)
         writer.add_scalar("training/smoothed_completion", np.mean(smoothed_completion), episode_idx)
         writer.add_scalar("training/nb_steps", nb_steps, episode_idx)
