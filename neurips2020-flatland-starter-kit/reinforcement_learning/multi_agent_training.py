@@ -2,6 +2,7 @@ from pathlib import Path
 import sys
 import os
 import random
+import math
 
 base_dir = Path(__file__).resolve().parent.parent
 sys.path.append(str(base_dir))
@@ -85,6 +86,16 @@ def create_rail_env(env_params, tree_observation):
 
 
 def train_agent(train_params, train_env_params, eval_env_params, obs_params):
+    if True:
+        # CH3: Training plan
+        # SET INITIAL PARAMS
+        train_env_params.n_agents = 1
+        train_env_params.x_dim = 25
+        train_env_params.y_dim = 25
+        train_env_params.n_cities = 2
+        train_env_params.max_rails_between_cities = 2
+        train_env_params.max_rails_in_city = 4
+
     # Environment parameters
     n_agents = train_env_params.n_agents
     x_dim = train_env_params.x_dim
@@ -93,6 +104,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
     max_rails_between_cities = train_env_params.max_rails_between_cities
     max_rails_in_city = train_env_params.max_rails_in_city
     seed = train_env_params.seed
+    number_of_agents = n_agents
 
     # Unique ID for this training
     now = datetime.now()
@@ -253,11 +265,37 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
             number_of_agents = n_agents
             train_env_params.n_agents = n_agents
         else:
-            number_of_agents = int(min(n_agents, 1 + np.floor(episode_idx / 200)))
-            train_env_params.n_agents = episode_idx % number_of_agents + 1
+            if True: # CH3: Incrementing difficulty
+                if (episode_idx % (n_episodes // 30)) == 1:
+                    # Make an eval env based on the PREVIOUS difficulty!!
+                    eval_env = create_rail_env(train_env_params, tree_observation)
 
-        if True: # CH3: DYNAMICALLY CHANGE ENV PARAMS HERE!!?!?!
-            pass
+                    print("\n\n== INCREMENTING DIFFICULTY ==\n\n")
+                    train_env_params.n_agents += math.ceil(10**(len(str(train_env_params.n_agents))-1)*0.75)
+                    train_env_params.n_cities = train_env_params.n_agents // 10 + 2
+
+                    train_env_params.x_dim = math.ceil(math.sqrt((2*(math.ceil(train_env_params.max_rails_in_city/2) + 3)) ** 2 * (1.5*train_env_params.n_cities)))+7
+                    train_env_params.y_dim = train_env_params.x_dim
+
+                    train_env_params.malfunction_rate = int(250 * episode_idx // (n_episodes // 30))
+
+                    # Environment parameters
+                    n_agents = train_env_params.n_agents
+                    x_dim = train_env_params.x_dim
+                    y_dim = train_env_params.y_dim
+                    n_cities = train_env_params.n_cities
+                    max_rails_between_cities = train_env_params.max_rails_between_cities
+                    max_rails_in_city = train_env_params.max_rails_in_city
+                    seed = train_env_params.seed
+                    number_of_agents = n_agents
+
+                    agent_obs = [None] * n_agents
+                    agent_prev_obs = [None] * n_agents
+                    agent_prev_action = [2] * n_agents
+                    update_values = [False] * n_agents
+            else:
+                number_of_agents = int(min(n_agents, 1 + np.floor(episode_idx / 200)))
+                train_env_params.n_agents = episode_idx % number_of_agents + 1
 
         train_env = create_rail_env(train_env_params, tree_observation)
         obs, info = train_env.reset(regenerate_rail=True, regenerate_schedule=True)
@@ -664,7 +702,7 @@ def eval_policy(env, tree_observation, policy, train_params, obs_params):
 
 if __name__ == "__main__":
     parser = ArgumentParser()
-    parser.add_argument("-n", "--n_episodes", help="number of episodes to run", default=5000, type=int)
+    parser.add_argument("-n", "--n_episodes", help="number of episodes to run", default=10000, type=int)
     parser.add_argument("--n_agent_fixed", help="hold the number of agent fixed", action='store_true')
     parser.add_argument("-t", "--training_env_config", help="training config id (eg 0 for Test_0)", default=1,
                         type=int)
