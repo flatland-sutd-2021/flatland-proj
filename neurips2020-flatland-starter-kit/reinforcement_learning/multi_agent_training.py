@@ -269,6 +269,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                 if (episode_idx % (n_episodes // 30)) == 1:
                     # Make an eval env based on the PREVIOUS difficulty!!
                     eval_env = create_rail_env(train_env_params, tree_observation)
+                    eval_env.reset(regenerate_schedule=True, regenerate_rail=True)
 
                     print("\n\n== INCREMENTING DIFFICULTY ==\n\n")
                     train_env_params.n_agents += math.ceil(10**(len(str(train_env_params.n_agents))-1)*0.75)
