@@ -134,8 +134,9 @@ def get_self_extra_knn_states(env, handle,
     # +1 because an agent will likely find itself to be closest
     k = min(len(kd_tree.get_arrays()[0]), k_num + 1)
 
+    other_agent_distances = [get_agent_target_distance(env, handle) for handle in env.get_agent_handles()]
     max_min_target_dist = max(
-        get_agent_target_distance(env, handle) for handle in env.get_agent_handles()
+        dist for dist in other_agent_distances if not (math.isnan(dist) or math.isinf(dist))
     )
 
     agent = env.agents[handle]
@@ -188,6 +189,10 @@ def get_self_extra_knn_states(env, handle,
                 1 - (get_agent_target_distance(env, other_handle.squeeze())
                 / max_min_target_dist)
             )
+
+        # Remove invalid values
+        if math.isnan(soft_priority) or math.isinf(soft_priority):
+            soft_priority = 0
 
         # Populate state vector for kth nearest agent
         try: # Just in case it over traverses the list
