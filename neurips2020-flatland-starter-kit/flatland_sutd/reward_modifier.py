@@ -1,7 +1,7 @@
 from .state_construction import *
 
-GET_CLOSER = -0.35
-GET_FURTHER = -0.5
+GETTING_CLOSER = -0.35
+GETTING_FURTHER = -0.5
 
 REACH_EARLY = 10
 FINAL_INCOMPLETE = -250
@@ -59,7 +59,7 @@ class RewardModifier:
 		for handle in self.agent_list:
 			agent_status = train_env.agents[handle].status
 
-			if (agent_status != RailAgentStatus.DONE_REMOVED) and (agent_status != RailAgentStatus.DONE):
+			if (agent_status == RailAgentStatus.ACTIVE):
 				if(train_env.agents[handle].malfunction_data['malfunction'] == 0):
 					if (cur_pos[handle] == self.prev_position[handle]):
 						self.stop_dict[handle] += 1
@@ -73,7 +73,6 @@ class RewardModifier:
 						self.reward_dict[handle] += DEADLOCK_PENALTY
 			else:
 				self.stop_dict[handle] == 0
-				self.reward_dict[handle] += REACH_EARLY
 
 		self.prev_position = cur_pos
 
@@ -87,13 +86,18 @@ class RewardModifier:
 		for handle in self.agent_list:
 			agent_status = train_env.agents[handle].status
 
-			if (agent_status != RailAgentStatus.DONE_REMOVED) and (agent_status != RailAgentStatus.DONE) and (train_env.agents[handle].malfunction_data['malfunction'] == 0):
+			# Reward agents that arrive early
+			if (agent_status == RailAgentStatus.DONE_REMOVED) or (agent_status == RailAgentStatus.DONE):
+				self.reward_dict[handle] += REACH_EARLY
+
+			# Otherwise penalise
+			elif train_env.agents[handle].malfunction_data['malfunction'] == 0:
 				dist = self.get_agent_dist(train_env, handle)
 
 				if dist < self.prev_distance[handle]:
-					self.reward_dict[handle] += GET_CLOSER
+					self.reward_dict[handle] += GETTING_CLOSER
 				elif dist > self.prev_distance[handle]:
-					self.reward_dict[handle] += GET_FURTHER
+					self.reward_dict[handle] += GETTING_FURTHER
 
 			# # Reward reaching target sooner
 			# if agent_status == RailAgentStatus.DONE_REMOVED:
