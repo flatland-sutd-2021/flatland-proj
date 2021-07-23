@@ -668,14 +668,14 @@ def eval_policy(env, tree_observation, policy, train_params, obs_params):
                             rvnn_out = policy.rvnn(obs[agent])
                             state_vector = [
                                 # == ROOT ==
-                                *semi_normalise_tree_obs(train_env, obs, agent_handle, num_agents_on_map),
+                                *semi_normalise_tree_obs(env, obs, agent, num_agents_on_map),
 
                                 # == ROOT EXTRA ==
-                                train_env.number_of_agents,
-                                *get_self_extra_states(train_env, obs, agent_handle),
-                                get_agent_priority_naive(train_env, predictor)[agent_handle],
-                                reward_mod.stop_dict[agent_handle], # staticness
-                                *get_self_extra_knn_states(train_env, agent_handle, agent_handles, kd_tree, k_num=5),
+                                env.number_of_agents,
+                                *get_self_extra_states(env, obs, agent),
+                                get_agent_priority_naive(env, predictor)[agent],
+                                reward_mod.stop_dict[agent], # staticness
+                                *get_self_extra_knn_states(env, agent, agent_handles, kd_tree, k_num=5),
 
                                 # == RVNN CHILDREN ==
                                 *rvnn_out
