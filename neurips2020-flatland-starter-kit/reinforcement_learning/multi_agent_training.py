@@ -532,7 +532,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
             ' Avg: {:7.3f}'
             ' | 💯 Done: {:6.2f}%'
             ' Avg: {:6.2f}%'
-            ' | 🎲 Epsilon: {:.3f} '
+            # ' | 🎲 Epsilon: {:.3f} '
             ' | 🔀 Action Probs: {}'.format(
                 episode_idx,
                 train_env_params.n_agents, number_of_agents,
@@ -542,7 +542,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                 smoothed_normalized_rewards,
                 100 * completion,
                 100 * smoothed_completion,
-                eps_start,
+                # eps_start,
                 format_action_prob(action_probs)
             ), end=" ", flush=True)
 
