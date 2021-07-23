@@ -137,9 +137,13 @@ def get_self_extra_knn_states(env, handle,
     k = min(len(kd_tree.get_arrays()[0]), k_num + 1)
 
     other_agent_distances = [get_agent_target_distance(env, handle) for handle in env.get_agent_handles()]
-    max_min_target_dist = max(
-        dist for dist in other_agent_distances if not (math.isnan(dist) or math.isinf(dist))
-    )
+
+    try:
+        max_min_target_dist = max(
+            dist for dist in other_agent_distances if not (math.isnan(dist) or math.isinf(dist))
+        )
+    except:
+        max_min_target_dist = 9999
 
     agent = env.agents[handle]
 

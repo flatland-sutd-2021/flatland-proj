@@ -725,7 +725,7 @@ if __name__ == "__main__":
     parser.add_argument("-e", "--evaluation_env_config", help="evaluation config id (eg 0 for Test_0)", default=1,
                         type=int)
     parser.add_argument("--n_evaluation_episodes", help="number of evaluation episodes", default=10, type=int)
-    parser.add_argument("--checkpoint_interval", help="checkpoint interval", default=100, type=int)
+    parser.add_argument("--checkpoint_interval", help="checkpoint interval", default=200, type=int)
     parser.add_argument("--eps_start", help="max exploration", default=1.0, type=float)
     parser.add_argument("--eps_end", help="min exploration", default=0.01, type=float)
     parser.add_argument("--eps_decay", help="exploration decay", default=0.9975, type=float)
