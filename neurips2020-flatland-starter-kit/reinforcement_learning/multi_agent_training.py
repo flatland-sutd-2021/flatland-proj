@@ -159,6 +159,9 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
         # Calculate the state size given the depth of the tree observation and the number of features
         state_size = tree_observation.observation_dim
 
+    if True:
+        state_size = 71 # CH3: CHANGE THIS ONCE STATE VECTOR IS FINALISED
+
     action_count = [0] * get_flatland_full_action_size()
     action_dict = dict()
     agent_obs = [None] * n_agents
@@ -253,7 +256,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
             number_of_agents = int(min(n_agents, 1 + np.floor(episode_idx / 200)))
             train_env_params.n_agents = episode_idx % number_of_agents + 1
 
-        if False: # CH3: DYNAMICALLY CHANGE ENV PARAMS HERE!!?!?!
+        if True: # CH3: DYNAMICALLY CHANGE ENV PARAMS HERE!!?!?!
             pass
 
         train_env = create_rail_env(train_env_params, tree_observation)
@@ -273,7 +276,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
         actions_taken = []
 
         # Compute expensive stuff ONCE per step
-        if False: # CH3: Set to True when ready
+        if True: # CH3: Set to True when ready
             agent_positions, agent_handles = get_agent_positions(train_env)
             kd_tree = KDTree(agent_positions)
 
@@ -283,7 +286,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
         # Build initial agent-specific observations
         for agent_handle in train_env.get_agent_handles():
             if tree_observation.check_is_observation_valid(obs[agent_handle]):
-                if False: # CH3: When it is time...
+                if True: # CH3: When it is time...
                     # NOTE: This bit might look unecessary, but it's actually
                     # needed to populate agent_prev_obs...
                     state_vector = [
@@ -292,7 +295,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
 
                         # == ROOT EXTRA ==
                         train_env.number_of_agents,
-                        *get_self_extra_states(env, obs, agent_handle),
+                        *get_self_extra_states(train_env, obs, agent_handle),
                         # priority,
                         0, # initial staticness is 0
                         *get_self_extra_knn_states(train_env, agent_handle, agent_handles, kd_tree, k_num=5),
@@ -300,6 +303,8 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                         # == RVNN CHILDREN ==
                         # policy.rvnn(something)
                     ]
+
+                    # print("STATE VECTOR SIZE:", len(state_vector))
 
                     agent_obs[agent_handle] = state_vector # CH3: OBS HACK IS HERE!!!
                 else:
@@ -326,7 +331,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
             policy.start_step(train=True)
 
             # Compute expensive stuff ONCE per step
-            if False: # CH3: Set to True when ready
+            if True: # CH3: Set to True when ready
                 agent_positions, agent_handles = get_agent_positions(train_env)
                 kd_tree = KDTree(agent_positions)
 
@@ -336,14 +341,14 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
             for agent_handle in train_env.get_agent_handles():
                 agent = train_env.agents[agent_handle]
                 if info['action_required'][agent_handle]:
-                    if False: # CH3: When it is time...
+                    if True: # CH3: When it is time...
                         state_vector = [
                             # == ROOT ==
                             *semi_normalise_tree_obs(train_env, obs, agent_handle, num_agents_on_map),
 
                             # == ROOT EXTRA ==
                             train_env.number_of_agents,
-                            *get_self_extra_states(env, obs, agent_handle),
+                            *get_self_extra_states(train_env, obs, agent_handle),
                             # priority,
                             reward_mod.stop_dict[agent_handle], # staticness
                             *get_self_extra_knn_states(train_env, agent_handle, agent_handles, kd_tree, k_num=5),
@@ -371,7 +376,6 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
             # Environment step
             step_timer.start()
             next_obs, all_rewards, done, info = train_env.step(map_actions(action_dict))
-
 
             # CH3: HACK REWARDS HERE
             if True:
@@ -413,7 +417,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                 if tree_observation.check_is_observation_valid(next_obs[agent_handle]):
                     preproc_timer.start()
 
-                    if False: # CH3: When it's time...
+                    if True: # CH3: When it's time...
                         pass # Yep, because we do this step ontop
                     else:
                         agent_obs[agent_handle] = tree_observation.get_normalized_observation(next_obs[agent_handle],
@@ -584,12 +588,12 @@ def eval_policy(env, tree_observation, policy, train_params, obs_params):
             eval_mod.check_staticness(env)
 
             # Compute expensive stuff ONCE per step
-            if False: # CH3: Set to True when ready
-                agent_positions, agent_handles = get_agent_positions(train_env)
+            if True: # CH3: Set to True when ready
+                agent_positions, agent_handles = get_agent_positions(env)
                 kd_tree = KDTree(agent_positions)
 
                 # This is -NOT- total agent count or active agent count!
-                num_agents_on_map = get_num_agents_on_map(train_env)
+                num_agents_on_map = get_num_agents_on_map(env)
 
             for agent in env.get_agent_handles():
                 if tree_observation.check_is_observation_valid(agent_obs[agent]):
@@ -599,17 +603,17 @@ def eval_policy(env, tree_observation, policy, train_params, obs_params):
                 action = 0
                 if info['action_required'][agent]:
                     if tree_observation.check_is_observation_valid(agent_obs[agent]):
-                        if False: # CH3: When it is time...
+                        if True: # CH3: When it is time...
                             state_vector = [
                                 # == ROOT ==
-                                *semi_normalise_tree_obs(train_env, obs, agent_handle, num_agents_on_map),
+                                *semi_normalise_tree_obs(env, obs, agent_handle, num_agents_on_map),
 
                                 # == ROOT EXTRA ==
-                                train_env.number_of_agents,
+                                env.number_of_agents,
                                 *get_self_extra_states(env, obs, agent_handle),
                                 # priority,
                                 eval_mod.stop_dict[agent_handle], # staticness
-                                *get_self_extra_knn_states(train_env, agent_handle, agent_handles, kd_tree, k_num=5),
+                                *get_self_extra_knn_states(env, agent_handle, agent_handles, kd_tree, k_num=5),
 
                                 # == RVNN CHILDREN ==
                                 # policy.rvnn(something)
