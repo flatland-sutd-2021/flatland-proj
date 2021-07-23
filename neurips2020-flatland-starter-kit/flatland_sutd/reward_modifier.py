@@ -115,3 +115,5 @@ class RewardModifier:
 
 			if (agent_status != RailAgentStatus.DONE_REMOVED) and (agent_status != RailAgentStatus.DONE):
 				self.reward_dict[handle] -= 250
+
+# NOTE: Penalty for valid actions is DONE IN AN OUTER LOOP

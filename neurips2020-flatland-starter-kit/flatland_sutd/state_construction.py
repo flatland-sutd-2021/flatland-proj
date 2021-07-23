@@ -58,9 +58,9 @@ def get_valid_actions(env, handle):
 
     # Get valid transitions and map to actions
     transitions = env.rail.get_transitions(*position, direction)
-    valid_actions = [
+    valid_actions = set([
         (i + 2 - direction) % 4 for i, x in enumerate(transitions) if x
-    ]
+    ])
 
     return valid_actions
 

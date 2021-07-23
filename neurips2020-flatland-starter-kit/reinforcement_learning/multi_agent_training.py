@@ -325,6 +325,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
 
         # hacked rewards object starts here
         reward_mod = RewardModifier(train_env)
+        valid_action_penalties = {}
 
         for step in range(max_steps - 1):
             inference_timer.start()
@@ -361,6 +362,12 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
 
                     update_values[agent_handle] = True
                     action = policy.act(agent_handle, agent_obs[agent_handle], eps=eps_start)
+
+                    if action not in get_valid_actions(train_env, agent_handle):
+                        valid_action_penalties[agent_handle] = -10
+                    else:
+                        valid_action_penalties[agent_handle] = 0
+
                     action_count[map_action(action)] += 1
                     actions_taken.append(map_action(action))
                 else:
@@ -405,7 +412,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                     policy.step(agent_handle,
                                 agent_prev_obs[agent_handle],
                                 map_action_policy(agent_prev_action[agent_handle]),
-                                modded_rewards[agent_handle], # CH3: HACK REWARDS HERE, DON'T USE ALL_REWARDS
+                                modded_rewards[agent_handle] + valid_action_penalties[agent_handle], # CH3: HACK REWARDS HERE, DON'T USE ALL_REWARDS
                                 agent_obs[agent_handle],
                                 done[agent_handle])
                     learn_timer.end()
