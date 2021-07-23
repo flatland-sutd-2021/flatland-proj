@@ -264,6 +264,8 @@ class PPOPolicy(LearningPolicy):
         return states, actions, rewards, states_next, dones, probs_action
 
     def train_net(self):
+        self.optimizer.zero_grad()
+
         # All agents have to propagate their experiences made during past episode
         for handle in range(len(self.current_episode_memory)):
             # Extract agent's episode history (list of all transitions)
