@@ -266,7 +266,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
             train_env_params.n_agents = n_agents
         else:
             if True: # CH3: Incrementing difficulty
-                if (episode_idx % (n_episodes // 30)) == 1:
+                if (episode_idx % (n_episodes // 40)) == 1:
                     # Make an eval env based on the PREVIOUS difficulty!!
                     eval_env = create_rail_env(train_env_params, tree_observation)
                     eval_env.reset(regenerate_schedule=True, regenerate_rail=True)
@@ -278,7 +278,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                     train_env_params.x_dim = math.ceil(math.sqrt((2*(math.ceil(train_env_params.max_rails_in_city/2) + 3)) ** 2 * (1.5*train_env_params.n_cities)))+7
                     train_env_params.y_dim = train_env_params.x_dim
 
-                    train_env_params.malfunction_rate = int(250 * episode_idx // (n_episodes // 30))
+                    train_env_params.malfunction_rate = int(250 * (episode_idx // (n_episodes // 40)))
 
                     # Environment parameters
                     n_agents = train_env_params.n_agents
@@ -427,8 +427,8 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
 
             # CH3: HACK REWARDS HERE
             if True:
-                # Check if final step
-                if (step == max_steps -1):
+                # Check one step before final step because weird things happen on the last step
+                if (step == max_steps - 2):
                     final = True
                 else:
                     final = False
@@ -542,7 +542,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
             ), end=" ", flush=True)
 
         # Evaluate policy and log results at some interval
-        if episode_idx % checkpoint_interval == 0 and n_eval_episodes > 0:
+        if episode_idx % checkpoint_interval == 0 and n_eval_episodes > 100:
             scores, completions, nb_steps_eval = eval_policy(eval_env,
                                                              tree_observation,
                                                              policy,
@@ -610,6 +610,7 @@ def format_action_prob(action_probs):
 
 
 def eval_policy(env, tree_observation, policy, train_params, obs_params):
+    print("")
     n_eval_episodes = train_params.n_evaluation_episodes
     max_steps = env._max_episode_steps
     tree_depth = obs_params.observation_tree_depth
@@ -623,6 +624,8 @@ def eval_policy(env, tree_observation, policy, train_params, obs_params):
     nb_steps = []
 
     for episode_idx in range(n_eval_episodes):
+        print(f"\rEVALUATING POLICY: {episode_idx}/{n_eval_episodes}", end="")
+
         agent_obs = [None] * env.get_num_agents()
         score = 0.0
 
@@ -701,7 +704,7 @@ def eval_policy(env, tree_observation, policy, train_params, obs_params):
 
         nb_steps.append(final_step)
 
-    print(" ✅ Eval: score {:.3f} done {:.1f}%\n".format(np.mean(scores), np.mean(completions) * 100.0), flush=True)
+    print("\n ✅ Eval: score {:.3f} done {:.1f}%\n".format(np.mean(scores), np.mean(completions) * 100.0), flush=True)
 
     return scores, completions, nb_steps
 

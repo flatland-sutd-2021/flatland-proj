@@ -119,8 +119,6 @@ class RewardModifier:
 		return modified_rewards
 
 	def final_check(self, train_env):
-		agent_state, agent_handles = get_agent_state
-
 		for handle in self.agent_list:
 			agent_status = train_env.agents[handle]
 
