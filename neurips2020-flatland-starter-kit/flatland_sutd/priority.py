@@ -4,6 +4,7 @@ from flatland.envs.rail_env import RailEnv
 from flatland.envs.agent_utils import RailAgentStatus
 from flatland.core.env_prediction_builder import PredictionBuilder
 
+import numpy as np
 
 def get_agent_priority_naive(
     env: RailEnv, predictor: PredictionBuilder
@@ -46,10 +47,12 @@ def get_agent_priority_naive(
                     break
 
     # priority = degree of conflict graph node
-    priorities = {i: len(conflict_graph[i]) for i in range(env.number_of_agents)}
+    priorities = np.argsort([len(conflict_graph[i]) for i in range(env.number_of_agents)])
+    # priorities = {i: len(conflict_graph[i]) for i in range(env.number_of_agents)}
 
     # get largest priority degree
-    max_degree = max([d for _, d in priorities.items()])
+    # max_degree = max([d for _, d in priorities.items()])
+    max_degree = max(priorities)
 
     if max_degree == 0:
         max_degree = 1
