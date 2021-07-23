@@ -280,7 +280,14 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                     train_env_params.x_dim = math.ceil(math.sqrt((2*(math.ceil(train_env_params.max_rails_in_city/2) + 3)) ** 2 * (1.5*train_env_params.n_cities)))+7
                     train_env_params.y_dim = train_env_params.x_dim
 
-                    train_env_params.malfunction_rate = int(250 * (episode_idx // (n_episodes // 30)))
+                    # Malfunction interval is the minimum number of intervals between malfunctions
+                    # As agent count increases, malfunctions from individual agents become MORE SPARSE
+                    # since more time is allotted to completing the environmenet
+                    malfunction_interval = int(250 * (episode_idx // (n_episodes // 11)))
+                    if malfunction_interval == 0:
+                        train_env_params.malfunction_rate = 0
+                    else:
+                        train_env_params.malfunction_rate = 1 / malfunction_interval
 
                     # Environment parameters
                     n_agents = train_env_params.n_agents
