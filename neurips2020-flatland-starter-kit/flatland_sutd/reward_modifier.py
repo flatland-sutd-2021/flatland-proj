@@ -1,12 +1,14 @@
 from .state_construction import *
 
-STOP_LESS_TEN = -1
-STOP_MORE_TEN = -10
 GET_CLOSER = -0.35
 GET_FURTHER = -0.5
+
 REACH_EARLY = 10
 FINAL_INCOMPLETE = -250
-STATICNESS = 10
+
+STOPPING_PENALTY = -1
+DEADLOCK_THRESH = 10
+DEADLOCK_PENALTY = -10
 
 class RewardModifier:
 	def __init__ (self, train_env):
@@ -63,12 +65,12 @@ class RewardModifier:
 						self.stop_dict[handle] += 1
 
 					# Penalise stopping
-					if (self.stop_dict[handle] > 0) and (self.stop_dict[handle] < 10):
-						self.reward_dict[handle] += STOP_LESS_TEN
+					if (self.stop_dict[handle] > 0) and (self.stop_dict[handle] < DEADLOCK_THRESH):
+						self.reward_dict[handle] += STOPPING_PENALTY
 
 					# Heavily penalise deadlock
-					elif (self.stop_dict[handle] > STATICNESS):
-						self.reward_dict[handle] += STOP_MORE_TEN
+				elif (self.stop_dict[handle] > DEADLOCK_THRESH):
+						self.reward_dict[handle] += DEADLOCK_PENALTY
 			else:
 				self.stop_dict[handle] == 0
 				self.reward_dict[handle] += REACH_EARLY
