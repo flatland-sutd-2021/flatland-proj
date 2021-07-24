@@ -174,7 +174,14 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
         state_size = tree_observation.observation_dim
 
     if True:
-        state_size = 72 + 12 + 12 # CH3: CHANGE THIS ONCE STATE VECTOR IS FINALISED
+        # k_best_paths: 17 + 17
+        # root_extra: 15 + k * 9
+        # rvnn children: 12 * k_branches
+        state_size = (
+            17 + 17
+            + 15 + 5 * 9
+            + 12 * 2
+        )
 
     action_count = [0] * get_flatland_full_action_size()
     action_dict = dict()
@@ -342,7 +349,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                     rvnn_out = policy.rvnn(obs[agent_handle])
                     state_vector = [
                         # == ROOT ==
-                        *semi_normalise_tree_obs(train_env, obs, agent_handle, num_agents_on_map),
+                        *get_k_best_node_states(obs[agent_handle], train_env, num_agents_on_map, obs_params.observation_tree_depth),
 
                         # == ROOT EXTRA ==
                         train_env.number_of_agents,
@@ -398,7 +405,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                         rvnn_out = policy.rvnn(obs[agent_handle])
                         state_vector = [
                             # == ROOT ==
-                            *semi_normalise_tree_obs(train_env, obs, agent_handle, num_agents_on_map),
+                            *get_k_best_node_states(obs[agent_handle], train_env, num_agents_on_map, obs_params.observation_tree_depth),
 
                             # == ROOT EXTRA ==
                             train_env.number_of_agents,
@@ -675,7 +682,7 @@ def eval_policy(env, tree_observation, policy, train_params, obs_params):
                             rvnn_out = policy.rvnn(obs[agent])
                             state_vector = [
                                 # == ROOT ==
-                                *semi_normalise_tree_obs(env, obs, agent, num_agents_on_map),
+                                *get_k_best_node_states(obs[agent], env, num_agents_on_map, obs_params.observation_tree_depth),
 
                                 # == ROOT EXTRA ==
                                 env.number_of_agents,

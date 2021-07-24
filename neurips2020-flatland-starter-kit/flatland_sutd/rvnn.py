@@ -1,15 +1,6 @@
-from flatland.envs.rail_env import RailEnv
-from flatland.envs.rail_generators import sparse_rail_generator
-from flatland.envs.schedule_generators import sparse_schedule_generator
-from flatland_scratch.flatland_utils.observation_utils import normalize_observation
-from flatland.envs.observations import TreeObsForRailEnv
-
 import torch.nn.functional as F
 import torch.nn as nn
 import torch
-
-import numpy as np
-import PIL
 
 from collections import deque
 import copy
@@ -167,6 +158,12 @@ class RvNN(nn.Module):
 
 # RECURSIVE TREE REDUCTION =====================================================
 if __name__ == "__main__":
+    from flatland.envs.rail_env import RailEnv
+    from flatland.envs.rail_generators import sparse_rail_generator
+    from flatland.envs.schedule_generators import sparse_schedule_generator
+    from flatland_scratch.flatland_utils.observation_utils import normalize_observation
+    from flatland.envs.observations import TreeObsForRailEnv
+
     MAX_DEPTH = 4
 
     n_agents = 5
