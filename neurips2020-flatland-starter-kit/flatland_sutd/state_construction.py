@@ -9,6 +9,8 @@ from flatland.envs.agent_utils import RailAgentStatus
 
 from sklearn.neighbors import KDTree
 
+from .rvnn import tree_obs_expand
+
 import numpy as np
 import PIL
 import math
@@ -71,12 +73,11 @@ def get_num_agents_on_map(env):
     return max(1, sum([1 for agent in env.agents if agent.status == RailAgentStatus.ACTIVE]))
 
 
-def semi_normalise_tree_obs(env, obs, handle, num_agents_on_map):
-    """Do normalisation on tree observation node."""
-    node = list(obs[handle])
-
+def semi_normalise_node(env, node, num_agents_on_map):
     if len(node) == 13:
-        node = node[:-1]
+        node = list(node)[:-1]
+    else:
+        node = list(node)
 
     # Normalise
     if num_agents_on_map == 0:
@@ -86,10 +87,21 @@ def semi_normalise_tree_obs(env, obs, handle, num_agents_on_map):
     node[8] = node[8] / num_agents_on_map
     node[11] = node[11] / env.number_of_agents
 
-    if math.isinf(node[6]):
-        node[6] = 9999
+    for i in [0, 1, 2, 3, 4, 6]:
+        if math.isinf(node[i]):
+            node[i] = 999
 
     return node
+
+def semi_normalise_tree_obs(env, obs, handle, num_agents_on_map, degree=2):
+    """Do normalisation on EXPANDED tree observation node."""
+    node = obs[handle]
+    nodes = []
+
+    for child_node in tree_obs_expand(node, degree=degree):
+        nodes.extend(semi_normalise_node(env, child_node, num_agents_on_map))
+
+    return nodes
 
 
 # ROOT EXTRA ===================================================================
@@ -98,7 +110,7 @@ def get_self_extra_states(env, obs, handle):
 
     # Get valid actions
     action_state = [0, 0, 0, 0]
-    for idx, action in enumerate(['F', 'L', 'R', 'B']):
+    for idx, action in enumerate(['B', 'L', 'F', 'R']):
         child_node = obs[handle].childs[action]
 
         if type(child_node) is float:
@@ -143,7 +155,7 @@ def get_self_extra_knn_states(env, handle,
             dist for dist in other_agent_distances if not (math.isnan(dist) or math.isinf(dist))
         )
     except:
-        max_min_target_dist = 9999
+        max_min_target_dist = 999
 
     agent = env.agents[handle]
 
