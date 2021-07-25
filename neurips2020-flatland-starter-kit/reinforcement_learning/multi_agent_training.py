@@ -206,6 +206,9 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
     # Double Dueling DQN policy
     if train_params.policy == "DDDQN":
         policy = DDDQNPolicy(state_size, get_action_size(), train_params)
+    elif train_params.policy == "SUTD":
+        inter_policy = PPOPolicy(state_size, get_action_size(), use_replay_buffer=False, in_parameters=train_params)
+        policy = DeadLockAvoidanceWithDecisionAgent(train_env, state_size, get_action_size(), inter_policy)
     elif train_params.policy == "PPO":
         policy = PPOPolicy(state_size, get_action_size(), use_replay_buffer=False, in_parameters=train_params)
     elif train_params.policy == "DeadLockAvoidance":
@@ -726,6 +729,7 @@ def eval_policy(env, tree_observation, policy, train_params, obs_params):
         nb_steps.append(final_step)
 
     print("\n\n ✅ Eval: score {:.3f} done {:.1f}%\n".format(np.mean(scores), np.mean(completions) * 100.0), flush=True)
+    policy.report_selector()
 
     return scores, completions, nb_steps
 
