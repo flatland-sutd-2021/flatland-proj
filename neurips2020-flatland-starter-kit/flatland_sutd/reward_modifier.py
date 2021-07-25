@@ -69,7 +69,19 @@ class RewardModifier:
 						self.reward_dict[handle] += STOPPING_PENALTY
 
 					# Heavily penalise deadlock
-				elif (self.stop_dict[handle] > DEADLOCK_THRESH):
+					elif (self.stop_dict[handle] >= DEADLOCK_THRESH):
+						self.reward_dict[handle] += DEADLOCK_PENALTY
+			elif (agent_status == RailAgentStatus.READY_TO_DEPART):
+				if (train_env.agents[handle].malfunction_data['malfunction'] == 0):
+					if (cur_pos[handle] == self.prev_position[handle]):
+						self.stop_dict[handle] += 1
+
+					# Penalise stopping
+					if (self.stop_dict[handle] > 0) and (self.stop_dict[handle] < DEADLOCK_THRESH*10):
+						self.reward_dict[handle] += STOPPING_PENALTY
+
+					# Heavily penalise deadlock
+					elif (self.stop_dict[handle] >= DEADLOCK_THRESH*10):
 						self.reward_dict[handle] += DEADLOCK_PENALTY
 			else:
 				self.stop_dict[handle] == 0
