@@ -80,8 +80,8 @@ def create_rail_env(env_params, tree_observation):
         schedule_generator=sparse_schedule_generator(),
         number_of_agents=n_agents,
         malfunction_generator=ParamMalfunctionGen(malfunction_parameters),
-        obs_builder_object=tree_observation
-        # random_seed=seed
+        obs_builder_object=tree_observation,
+        random_seed=None
     )
 
 
@@ -89,7 +89,9 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
     if True:
         # CH3: Training plan
         # SET INITIAL PARAMS
-        train_env_params.n_agents = 1
+
+        SUCCESS_THRESHOLD = 20
+        train_env_params.n_agents = 2
         train_env_params.x_dim = 25
         train_env_params.y_dim = 25
         train_env_params.n_cities = 2
@@ -181,6 +183,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
             17 + 17
             + 15 + 5 * 9
             + 12 * 2
+            + 5
         )
 
     action_count = [0] * get_flatland_full_action_size()
@@ -264,6 +267,8 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
             training_id
         ))
 
+    success_count = 0
+
     for episode_idx in range(n_episodes + 1):
         step_timer = Timer()
         reset_timer = Timer()
@@ -278,7 +283,9 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
             train_env_params.n_agents = n_agents
         else:
             if True: # CH3: Incrementing difficulty
-                if (episode_idx % (n_episodes // 30)) == 1:
+                if (episode_idx % (n_episodes // 30)) == 1 or success_count > SUCCESS_THRESHOLD:
+                    success_count = 0
+
                     # Make an eval env based on the PREVIOUS difficulty!!
                     eval_env = create_rail_env(train_env_params, tree_observation)
                     eval_env.reset(regenerate_schedule=True, regenerate_rail=True)
@@ -315,6 +322,8 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                     agent_prev_obs = [None] * n_agents
                     agent_prev_action = [2] * n_agents
                     update_values = [False] * n_agents
+                    policy.report_selector()
+
             else:
                 number_of_agents = int(min(n_agents, 1 + np.floor(episode_idx / 200)))
                 train_env_params.n_agents = episode_idx % number_of_agents + 1
@@ -342,6 +351,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
 
             # This is -NOT- total agent count or active agent count!
             num_agents_on_map = get_num_agents_on_map(train_env)
+            hint_agent = DeadLockAvoidanceAgent(train_env, get_action_size(), False)
 
         # Build initial agent-specific observations
         for agent_handle in train_env.get_agent_handles():
@@ -350,6 +360,8 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                     # NOTE: This bit might look unecessary, but it's actually
                     # needed to populate agent_prev_obs...
                     rvnn_out = policy.rvnn(obs[agent_handle])
+                    hint = [0, 0, 0, 0, 0]
+                    hint[hint_agent.act(agent_handle, obs[agent_handle], -1)] = 1
                     state_vector = [
                         # == ROOT ==
                         *get_k_best_node_states(obs[agent_handle], train_env, num_agents_on_map, obs_params.observation_tree_depth),
@@ -362,8 +374,10 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                         *get_self_extra_knn_states(train_env, agent_handle, agent_handles, kd_tree, k_num=5),
 
                         # == RVNN CHILDREN ==
-                        *rvnn_out
+                        *rvnn_out,
+                        *hint
                     ]
+
 
                     # print("STATE VECTOR SIZE:", len(state_vector))
                     # print(state_vector)
@@ -406,6 +420,8 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                 if info['action_required'][agent_handle]:
                     if True: # CH3: When it is time...
                         rvnn_out = policy.rvnn(obs[agent_handle])
+                        hint = [0, 0, 0, 0, 0]
+                        hint[hint_agent.act(agent_handle, obs[agent_handle], -1)] = 1
                         state_vector = [
                             # == ROOT ==
                             *get_k_best_node_states(obs[agent_handle], train_env, num_agents_on_map, obs_params.observation_tree_depth),
@@ -418,7 +434,8 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                             *get_self_extra_knn_states(train_env, agent_handle, agent_handles, kd_tree, k_num=5),
 
                             # == RVNN CHILDREN ==
-                            *rvnn_out
+                            *rvnn_out,
+                            *hint
                         ]
 
                         agent_obs[agent_handle] = state_vector # CH3: OBS HACK IS HERE!!!
@@ -428,7 +445,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
 
                     if True:
                         if action not in get_valid_actions(train_env, agent_handle):
-                            valid_action_penalties[agent_handle] = -10
+                            valid_action_penalties[agent_handle] = -5
                         else:
                             valid_action_penalties[agent_handle] = 0
 
@@ -513,6 +530,11 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
         # Collect information about training
         tasks_finished = sum(done[idx] for idx in train_env.get_agent_handles())
         completion = tasks_finished / max(1, train_env.get_num_agents())
+
+        if completion == 1:
+            success_count += 1
+        else:
+            success_count = 0
 
         normalized_score = score / (max_steps * train_env.get_num_agents())
         scores_window.append(normalized_score)
@@ -675,6 +697,7 @@ def eval_policy(env, tree_observation, policy, train_params, obs_params):
 
                 # This is -NOT- total agent count or active agent count!
                 num_agents_on_map = get_num_agents_on_map(env)
+                hint_agent = DeadLockAvoidanceAgent(env, get_action_size(), False)
 
             for agent in env.get_agent_handles():
                 if tree_observation.check_is_observation_valid(agent_obs[agent]):
@@ -686,6 +709,8 @@ def eval_policy(env, tree_observation, policy, train_params, obs_params):
                     if True or tree_observation.check_is_observation_valid(agent_obs[agent]):
                         if True: # CH3: When it is time...
                             rvnn_out = policy.rvnn(obs[agent])
+                            hint = [0, 0, 0, 0, 0]
+                            hint[hint_agent.act(agent, obs[agent], -1)] = 1
                             state_vector = [
                                 # == ROOT ==
                                 *get_k_best_node_states(obs[agent], env, num_agents_on_map, obs_params.observation_tree_depth),
@@ -698,7 +723,8 @@ def eval_policy(env, tree_observation, policy, train_params, obs_params):
                                 *get_self_extra_knn_states(env, agent, agent_handles, kd_tree, k_num=5),
 
                                 # == RVNN CHILDREN ==
-                                *rvnn_out
+                                *rvnn_out,
+                                *hint
                             ]
 
                             action = policy.act(agent, state_vector, eps=0.0)
@@ -759,10 +785,10 @@ if __name__ == "__main__":
     parser.add_argument("--gamma", help="discount factor", default=0.97, type=float)
     parser.add_argument("--tau", help="soft update of target parameters", default=0.5e-3, type=float)
     parser.add_argument("--learning_rate", help="learning rate", default=0.5e-4, type=float)
-    parser.add_argument("--hidden_size", help="hidden size (2 fc layers)", default=128, type=int)
+    parser.add_argument("--hidden_size", help="hidden size (2 fc layers)", default=256, type=int)
     parser.add_argument("--update_every", help="how often to update the network", default=10, type=int)
     parser.add_argument("--use_gpu", help="use GPU if available", default=False, type=bool)
-    parser.add_argument("--num_threads", help="number of threads PyTorch can use", default=4, type=int)
+    parser.add_argument("--num_threads", help="number of threads PyTorch can use", default=8, type=int)
     parser.add_argument("--render", help="render 1 episode in 100", action='store_true')
     parser.add_argument("--load_policy", help="policy filename (reference) to load", default="", type=str)
     parser.add_argument("--use_fast_tree_observation", help="use FastTreeObs instead of stock TreeObs",

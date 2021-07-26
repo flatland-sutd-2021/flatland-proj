@@ -3,10 +3,10 @@ from .state_construction import *
 GETTING_CLOSER = -0.35
 GETTING_FURTHER = -0.5
 
-REACH_EARLY = 10
-FINAL_INCOMPLETE = -250
+REACH_EARLY = 250
+FINAL_INCOMPLETE = -100
 
-STOPPING_PENALTY = -1
+STOPPING_PENALTY = -3
 DEADLOCK_THRESH = 10
 DEADLOCK_PENALTY = -10
 
@@ -18,6 +18,8 @@ class RewardModifier:
 		self.stop_dict = dict.fromkeys(agent_handles, 0) # counts the consecutive stops
 		self.prev_position = self.get_agent_pos(train_env)
 		self.prev_distance = self.get_all_agent_dist(train_env)
+
+		self.done_agents = set()
 
 	def reset_rewards(self):
 		self.reward_dict = dict.fromkeys(self.reward_dict, 0)
@@ -100,7 +102,12 @@ class RewardModifier:
 
 			# Reward agents that arrive early
 			if (agent_status == RailAgentStatus.DONE_REMOVED) or (agent_status == RailAgentStatus.DONE):
-				self.reward_dict[handle] += REACH_EARLY
+				if handle in self.done_agents:
+					self.reward_dict[handle] = 0
+				else:
+					self.reward_dict[handle] += REACH_EARLY
+
+				self.done_agents.add(handle)
 
 			# Otherwise penalise
 			elif train_env.agents[handle].malfunction_data['malfunction'] == 0:
@@ -140,5 +147,9 @@ class RewardModifier:
 
 			if (agent_status != RailAgentStatus.DONE_REMOVED) and (agent_status != RailAgentStatus.DONE):
 				self.reward_dict[handle] += FINAL_INCOMPLETE
+			else:
+				self.reward_dict[handle] += FINAL_COMPLETE
+
+		self.done_agents = set()
 
 # NOTE: Penalty for valid actions is DONE IN AN OUTER LOOP

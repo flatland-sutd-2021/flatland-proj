@@ -48,22 +48,18 @@ class ActorCriticModel(nn.Module):
         self.device = device
 
         self.common = nn.Sequential(
-            nn.Linear(state_size, hidsize1),
+            nn.Linear(state_size, hidsize2),
             nn.Tanh(),
-            nn.Linear(hidsize1, hidsize2),
+            nn.Linear(hidsize2, hidsize2),
             nn.Tanh(),
         ).to(self.device)
 
         self.actor = nn.Sequential(
-            nn.Linear(hidsize2, hidsize2),
-            nn.Tanh(),
             nn.Linear(hidsize2, action_size),
             nn.Softmax(dim=-1)
         ).to(self.device)
 
         self.critic = nn.Sequential(
-            nn.Linear(hidsize2, hidsize2),
-            nn.Tanh(),
             nn.Linear(hidsize2, 1)
         ).to(self.device)
 
@@ -169,10 +165,11 @@ class PPOPolicy(LearningPolicy):
         self.rvnn_model = RvNN(24, 12, 12, tree_obs_expand, device=self.device)
 
         self.learning_rate_actor = self.learning_rate
-        self.learning_rate_critic = self.learning_rate
+        self.learning_rate_critic = self.learning_rate*5
+        self.learning_rate_rvnn = self.learning_rate*3
 
-        self.optimizer = optim.RMSprop(
-            [{'params': self.rvnn_model.parameters(), 'lr': self.learning_rate_critic},
+        self.optimizer = optim.Adam(# optim.RMSprop(
+            [{'params': self.rvnn_model.parameters(), 'lr': self.learning_rate_rvnn},
              {'params': self.actor_critic_model.common.parameters(), 'lr': self.learning_rate_actor},
              {'params': self.actor_critic_model.actor.parameters(), 'lr': self.learning_rate_actor},
              {'params': self.actor_critic_model.critic.parameters(), 'lr': self.learning_rate_critic}]
@@ -231,7 +228,7 @@ class PPOPolicy(LearningPolicy):
             action_list.insert(0, action_i)
             done_list.insert(0, int(done_i))
 
-            discounted_reward = reward_i + self.gamma * discounted_reward * (1.0-int(done_i))
+            discounted_reward = reward_i + self.gamma * discounted_reward # * (1.0-int(done_i))
 
             reward_list.insert(0, discounted_reward)
             state_next_list.insert(0, state_next_i)

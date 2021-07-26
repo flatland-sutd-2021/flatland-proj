@@ -65,6 +65,7 @@ def get_valid_actions(env, handle):
     ])
 
     valid_actions.add(4)
+    valid_actions.add(0)
 
     return valid_actions
 
@@ -109,7 +110,7 @@ def get_self_extra_states(env, obs, handle):
     agent = env.agents[handle]
 
     # Get valid actions
-    action_state = [0, 0, 0, 0]
+    action_state = [999, 999, 999, 999]
     for idx, action in enumerate(['B', 'L', 'F', 'R']):
         child_node = obs[handle].childs[action]
 
