@@ -643,6 +643,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
         writer.add_scalar("timer/learn", learn_timer.get(), episode_idx)
         writer.add_scalar("timer/preproc", preproc_timer.get(), episode_idx)
         writer.add_scalar("timer/total", training_timer.get_current(), episode_idx)
+        writer.add_scalar("training/selector_proportion", policy.get_selector_proportion(), episode_idx)
         writer.flush()
 
 
@@ -771,8 +772,8 @@ if __name__ == "__main__":
                         type=int)
     parser.add_argument("-e", "--evaluation_env_config", help="evaluation config id (eg 0 for Test_0)", default=1,
                         type=int)
-    parser.add_argument("--n_evaluation_episodes", help="number of evaluation episodes", default=10, type=int)
-    parser.add_argument("--checkpoint_interval", help="checkpoint interval", default=200, type=int)
+    parser.add_argument("--n_evaluation_episodes", help="number of evaluation episodes", default=5, type=int)
+    parser.add_argument("--checkpoint_interval", help="checkpoint interval", default=100, type=int)
     parser.add_argument("--eps_start", help="max exploration", default=1.0, type=float)
     parser.add_argument("--eps_end", help="min exploration", default=0.01, type=float)
     parser.add_argument("--eps_decay", help="exploration decay", default=0.9975, type=float)
