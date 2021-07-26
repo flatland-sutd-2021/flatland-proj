@@ -21,23 +21,40 @@ from matplotlib.backends.backend_agg import FigureCanvas
 from reinforcement_learning.policy import LearningPolicy
 from utils.observation_utils import normalize_observation
 from utils.agent_action_config import map_actions
+from flatland_sutd import *
 
 
 def eval_policy_visual(
     env: RailEnv,
     tree_observation: ObservationBuilder,
     policy: LearningPolicy,
-    obs_params: Dict,
+    train_params: Namespace,
+    obs_params: Namespace,
     renderer: RenderTool,
 ) -> Tuple[List[np.ndarray], float, float, int]:
+    print(env._max_episode_steps)
 
-    # set up environment
+    print("", flush=True)
+    tree_depth = obs_params.observation_tree_depth
+    observation_radius = obs_params.observation_radius
+
+    predictor = ShortestPathPredictorForRailEnv(obs_params.observation_max_path_depth)
+
+    action_dict = dict()
+    scores = []
+    completions = []
+    nb_steps = []
+
+    print("EVALUATING POLICY:")
+
     obs, info = env.reset(regenerate_rail=True, regenerate_schedule=True)
     policy.reset(env)
 
-    # initialize observations and score
     agent_obs = [None] * env.get_num_agents()
     score = 0.0
+
+    max_steps = env._max_episode_steps
+    final_step = 0
 
     # render initial environment image
     renderer.render_env()
@@ -45,50 +62,99 @@ def eval_policy_visual(
 
     policy.start_episode(train=False)
 
-    for step in range(env._max_episode_steps - 1):
+    # create reward modifier for the purposes of tracking stops
+    eval_mod = RewardModifier(env)
+    for step in range(max_steps - 1):
         print(f"\r step: {step:04}", end="")
         policy.start_step(train=False)
-        action_dict = {}
 
-        # generate action_dict
-        for agent_handle in env.get_agent_handles():
-            # default action is 0
-            action = 0
+        eval_mod.check_staticness(env)
 
-            # get agent observations
-            if tree_observation.check_is_observation_valid(obs[agent_handle]):
-                agent_obs[agent_handle] = tree_observation.get_normalized_observation(
-                    obs[agent_handle],
-                    tree_depth=obs_params["observation_tree_depth"],
-                    observation_radius=obs_params["observation_radius"],
+        # Compute expensive stuff ONCE per step
+        if True:  # CH3: Set to True when ready
+            agent_positions, agent_handles = get_agent_positions(env)
+            kd_tree = KDTree(agent_positions)
+
+            # This is -NOT- total agent count or active agent count!
+            num_agents_on_map = get_num_agents_on_map(env)
+
+        for agent in env.get_agent_handles():
+            if tree_observation.check_is_observation_valid(agent_obs[agent]):
+                agent_obs[agent] = tree_observation.get_normalized_observation(
+                    obs[agent],
+                    tree_depth=tree_depth,
+                    observation_radius=observation_radius,
                 )
 
-            # update action if required
-            if info["action_required"][agent_handle]:
-                if tree_observation.check_is_observation_valid(obs[agent_handle]):
-                    action = policy.act(agent_handle, agent_obs[agent_handle], eps=0.0)
+            action = 0
+            if info["action_required"][agent]:
+                if True or tree_observation.check_is_observation_valid(
+                    agent_obs[agent]
+                ):
+                    if True:  # CH3: When it is time...
+                        rvnn_out = policy.rvnn(obs[agent])
+                        state_vector = [
+                            # == ROOT ==
+                            *get_k_best_node_states(
+                                obs[agent],
+                                env,
+                                num_agents_on_map,
+                                obs_params.observation_tree_depth,
+                            ),
+                            # == ROOT EXTRA ==
+                            env.number_of_agents,
+                            *get_self_extra_states(env, obs, agent),
+                            get_agent_priority_naive(env, predictor)[agent],
+                            eval_mod.stop_dict[agent],  # staticness
+                            *get_self_extra_knn_states(
+                                env, agent, agent_handles, kd_tree, k_num=5
+                            ),
+                            # == RVNN CHILDREN ==
+                            *rvnn_out,
+                        ]
 
-            # add action to action_dict
-            action_dict[agent_handle] = action
+                        action = policy.act(agent, state_vector, eps=0.0)
+                    else:
+                        agent_obs[agent] = tree_observation.get_normalized_observation(
+                            obs[agent],
+                            tree_depth,
+                            observation_radius=observation_radius,
+                        )
+                        action = policy.act(agent, agent_obs[agent], eps=0.0)
 
+            action_dict.update({agent: action})
         policy.end_step(train=False)
 
-        # step environment and render new environment image
+        print(action_dict)
         obs, all_rewards, done, info = env.step(map_actions(action_dict))
-        renderer.render_env()
+        renderer.render_env(show_observations=False)
         env_images.append(renderer.get_image())
 
-        for agent_handle in env.get_agent_handles():
-            score += all_rewards[agent_handle]
+        # No reward hacking here
+
+        for agent in env.get_agent_handles():
+            score += all_rewards[agent]
+
+        final_step = step
 
         if done["__all__"]:
-            print()
             break
+
+    policy.end_episode(train=False)
+    normalized_score = score / (max_steps * env.get_num_agents())
 
     tasks_finished = sum(done[idx] for idx in env.get_agent_handles())
     completion = tasks_finished / max(1, env.get_num_agents())
 
-    return env_images, score, completion, step
+    print(
+        "\n\n ✅ Eval: score {:.3f} done {:.1f}%\n".format(
+            normalized_score, completion * 100.0
+        ),
+        flush=True,
+    )
+    policy.report_selector()
+
+    return env_images, normalized_score, completion, final_step
 
 
 def generate_gif(path: str, env_images: List[np.ndarray]):
@@ -124,13 +190,46 @@ if __name__ == "__main__":
 
     import multi_agent_training
     from reinforcement_learning.ppo_agent import PPOPolicy
-    from utils.dead_lock_avoidance_agent import DeadLockAvoidanceAgent
+    from reinforcement_learning.deadlockavoidance_with_decision_agent import (
+        DeadLockAvoidanceWithDecisionAgent,
+    )
     from utils.agent_action_config import get_action_size
+
+    # training params
+    train_params = {
+        "n_episodes": 5000,
+        "n_agent_fixed": False,
+        "training_env_config": 1,
+        "evaluation_env_config": 1,
+        "n_evaluation_episodes": 10,
+        "checkpoint_interval": 100,
+        "eps_start": 1.0,
+        "eps_end": 0.01,
+        "eps_decay": 0.9975,
+        "buffer_size": 32000,
+        "buffer_min_size": 0,
+        "restore_replay_buffer": "",
+        "save_replay_buffer": False,
+        "batch_size": 128,
+        "gamma": 0.97,
+        "tau": 0.0005,
+        "learning_rate": 5e-05,
+        "hidden_size": 128,
+        "update_every": 10,
+        "use_gpu": False,
+        "num_threads": 4,
+        "render": False,
+        "load_policy": "",
+        "use_fast_tree_observation": False,
+        "max_depth": 2,
+        "policy": "DeadLockAvoidance",
+        "action_size": "full",
+    }
 
     # set up environment
     env_params = {
         # Test_2
-        "n_agents": 10,
+        "n_agents": 5,
         "x_dim": 30,
         "y_dim": 30,
         "n_cities": 2,
@@ -146,12 +245,14 @@ if __name__ == "__main__":
         "observation_max_path_depth": 10,
     }
 
-    predictor = ShortestPathPredictorForRailEnv(
-        obs_params["observation_max_path_depth"]
-    )
+    train_params = Namespace(**train_params)
+    env_params = Namespace(**env_params)
+    obs_params = Namespace(**obs_params)
+
+    predictor = ShortestPathPredictorForRailEnv(obs_params.observation_max_path_depth)
 
     tree_observation = TreeObsForRailEnv(
-        max_depth=obs_params["observation_max_path_depth"],
+        max_depth=obs_params.observation_max_path_depth,
         predictor=predictor,
     )
 
@@ -165,20 +266,29 @@ if __name__ == "__main__":
     tree_observation.get_normalized_observation = get_normalized_observation
 
     env = multi_agent_training.create_rail_env(
-        Namespace(**env_params),
+        env_params,
         tree_observation,
     )
 
     # set up policy
-    checkpoint = None
+    checkpoint = "./checkpoints_sutd/210726042625-800.pth"
 
-    n_features_per_node = tree_observation.observation_dim
-    n_nodes = sum(
-        [np.power(4, i) for i in range(obs_params["observation_tree_depth"] + 1)]
+    state_size = 17 + 17 + 15 + 5 * 9 + 12 * 2
+
+    inter_policy = PPOPolicy(
+        state_size,
+        get_action_size(),
+        use_replay_buffer=False,
+        in_parameters=train_params,
     )
-    state_size = n_features_per_node * n_nodes
 
-    policy = DeadLockAvoidanceAgent(env, get_action_size(), enable_eps=False)
+    policy = DeadLockAvoidanceWithDecisionAgent(
+        env,
+        state_size,
+        get_action_size(),
+        inter_policy,
+    )
+
     policy.load(checkpoint)
 
     # set up renderer
@@ -187,7 +297,12 @@ if __name__ == "__main__":
     # evaluate
     print("evaluating ...")
     env_images, score, completion, step = eval_policy_visual(
-        env, tree_observation, policy, obs_params, renderer
+        env,
+        tree_observation,
+        policy,
+        train_params,
+        obs_params,
+        renderer,
     )
 
     # generate gif
