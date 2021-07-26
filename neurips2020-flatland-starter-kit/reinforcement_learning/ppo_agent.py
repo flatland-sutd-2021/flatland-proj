@@ -169,7 +169,7 @@ class PPOPolicy(LearningPolicy):
         self.rvnn_model = RvNN(24, 12, 12, tree_obs_expand, device=self.device)
 
         self.learning_rate_actor = self.learning_rate
-        self.learning_rate_critic = self.learning_rate * 5
+        self.learning_rate_critic = self.learning_rate
 
         self.optimizer = optim.RMSprop(
             [{'params': self.rvnn_model.parameters(), 'lr': self.learning_rate_critic},
