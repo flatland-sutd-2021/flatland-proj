@@ -427,12 +427,12 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                     action = policy.act(agent_handle, agent_obs[agent_handle], eps=eps_start)
 
                     if True:
-                        # if action not in get_valid_actions(train_env, agent_handle):
-                        #     valid_action_penalties[agent_handle] = 0
-                        # else:
-                        #     valid_action_penalties[agent_handle] = 0
+                        if action not in get_valid_actions(train_env, agent_handle):
+                            valid_action_penalties[agent_handle] = -10
+                        else:
+                            valid_action_penalties[agent_handle] = 0
 
-                        valid_action_penalties[agent_handle] = 0
+                        # valid_action_penalties[agent_handle] = 0
 
                     action_count[map_action(action)] += 1
                     actions_taken.append(map_action(action))
