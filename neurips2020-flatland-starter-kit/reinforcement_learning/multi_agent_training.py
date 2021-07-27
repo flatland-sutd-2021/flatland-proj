@@ -91,7 +91,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
         # SET INITIAL PARAMS
 
         SUCCESS_THRESHOLD = 20
-        train_env_params.n_agents = 2
+        train_env_params.n_agents = 3
         train_env_params.x_dim = 25
         train_env_params.y_dim = 25
         train_env_params.n_cities = 2

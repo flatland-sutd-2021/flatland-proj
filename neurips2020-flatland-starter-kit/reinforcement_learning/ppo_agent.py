@@ -168,7 +168,7 @@ class PPOPolicy(LearningPolicy):
         self.learning_rate_critic = self.learning_rate*5
         self.learning_rate_rvnn = self.learning_rate*3
 
-        self.optimizer = optim.Adam(# optim.RMSprop(
+        self.optimizer = optim.RMSprop(
             [{'params': self.rvnn_model.parameters(), 'lr': self.learning_rate_rvnn},
              {'params': self.actor_critic_model.common.parameters(), 'lr': self.learning_rate_actor},
              {'params': self.actor_critic_model.actor.parameters(), 'lr': self.learning_rate_actor},
