@@ -193,6 +193,17 @@ while True:
         policy = DeadLockAvoidanceWithDecisionAgent(local_env, state_size, get_action_size(), inter_policy)
     elif load_policy == "MultiDecision":
         policy = MultiDecisionAgent(state_size, get_action_size(), Namespace(**{'use_gpu': False}))
+    elif load_policy == "SUTD":
+        observation_tree_depth = 4
+        state_size = (
+            17 + 17
+            + 15 + 5 * 9
+            + 12 * 2
+            + 5
+        )
+
+        inter_policy = PPOPolicy(state_size, get_action_size())
+        policy = DeadLockAvoidanceWithDecisionAgent(local_env, state_size, get_action_size(), inter_policy)
     else:
         policy = PPOPolicy(state_size, get_action_size(), use_replay_buffer=False,
                            in_parameters=Namespace(**{'use_gpu': False}))
@@ -225,6 +236,14 @@ while True:
             #####################################################################
             # Evaluation of a single episode
             #####################################################################
+            if True:
+                agent_positions, agent_handles = get_agent_positions(local_env)
+                kd_tree = KDTree(agent_positions)
+
+                # This is -NOT- total agent count or active agent count!
+                num_agents_on_map = get_num_agents_on_map(local_env)
+                hint_agent = DeadLockAvoidanceAgent(local_env, get_action_size(), False)
+
             steps += 1
             obs_time, agent_time, step_time = 0.0, 0.0, 0.0
             no_ops_mode = False
@@ -240,6 +259,30 @@ while True:
                             # cache hit
                             action = agent_last_action[agent_handle]
                             nb_hit += 1
+                        elif load_policy == "SUTD":
+                            if True: # CH3: When it is time...
+                                # NOTE: This bit might look unecessary, but it's actually
+                                # needed to populate agent_prev_obs...
+                                rvnn_out = policy.rvnn(observation[agent_handle])
+                                hint = [0, 0, 0, 0, 0]
+                                hint[hint_agent.act(agent_handle, observation[agent_handle], -1)] = 1
+                                state_vector = [
+                                    # == ROOT ==
+                                    *get_k_best_node_states(observation[agent_handle], local_env, num_agents_on_map, observation_tree_depth),
+
+                                    # == ROOT EXTRA ==
+                                    local_env.number_of_agents,
+                                    *get_self_extra_states(local_env, observation, agent_handle),
+                                    get_agent_priority_naive(local_env, predictor)[agent_handle],
+                                    0, # staticness
+                                    *get_self_extra_knn_states(local_env, agent_handle, agent_handles, kd_tree, k_num=5),
+
+                                    # == RVNN CHILDREN ==
+                                    *rvnn_out,
+                                    *hint
+                                ]
+
+                                action = policy.act(agent, state_vector, eps=0.0)
                         else:
                             normalized_observation = get_normalized_observation(observation[agent_handle],
                                                                                 observation_tree_depth,
