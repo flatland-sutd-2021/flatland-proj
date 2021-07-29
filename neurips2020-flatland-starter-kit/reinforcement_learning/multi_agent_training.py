@@ -90,7 +90,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
         # CH3: Training plan
         # SET INITIAL PARAMS
 
-        SUCCESS_THRESHOLD = 20
+        SUCCESS_THRESHOLD = 9999999999
         train_env_params.n_agents = 3
         train_env_params.x_dim = 25
         train_env_params.y_dim = 25

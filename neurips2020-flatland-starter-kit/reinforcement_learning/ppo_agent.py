@@ -186,6 +186,9 @@ class PPOPolicy(LearningPolicy):
         # sample a action to take
         torch_state = torch.tensor(state, dtype=torch.float).to(self.device)
         dist = self.actor_critic_model.get_actor_dist(torch_state)
+
+        return torch.argmax(dist.probs).item()
+
         action = dist.sample()
         return action.item()
 

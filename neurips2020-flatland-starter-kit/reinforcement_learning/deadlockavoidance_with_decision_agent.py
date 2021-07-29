@@ -20,7 +20,7 @@ class DeadLockAvoidanceWithDecisionAgent(HybridPolicy):
         self.dead_lock_avoidance_agent = DeadLockAvoidanceAgent(self.env, action_size, False)
         self.policy_selector = PPOPolicy(state_size, 2)
 
-        self.selector_steps = deque([], 500)
+        self.selector_steps = deque([], 5000)
 
         self.memory = self.learning_agent.memory
         self.loss = self.learning_agent.loss
