@@ -181,7 +181,9 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
         # rvnn children: 12 * k_branches
         state_size = (
             17 + 17
-            + 15 + 5 * 9
+            + 15
+            # ABLATION STUDY: Remove k_nearest_agents
+            # + 5 * 9
             + 12 * 2
             # + 5
         )
@@ -371,7 +373,9 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                         *get_self_extra_states(train_env, obs, agent_handle),
                         get_agent_priority_naive(train_env, predictor)[agent_handle],
                         0, # staticness
-                        *get_self_extra_knn_states(train_env, agent_handle, agent_handles, kd_tree, k_num=5),
+
+                        # ABLATION STUDY: Remove k_nearest_agents
+                        # *get_self_extra_knn_states(train_env, agent_handle, agent_handles, kd_tree, k_num=5),
 
                         # == RVNN CHILDREN ==
                         *rvnn_out,
@@ -431,7 +435,9 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                             *get_self_extra_states(train_env, obs, agent_handle),
                             get_agent_priority_naive(train_env, predictor)[agent_handle],
                             reward_mod.stop_dict[agent_handle], # staticness
-                            *get_self_extra_knn_states(train_env, agent_handle, agent_handles, kd_tree, k_num=5),
+
+                            # ABLATION STUDY: Remove k_nearest_agents
+                            # *get_self_extra_knn_states(train_env, agent_handle, agent_handles, kd_tree, k_num=5),
 
                             # == RVNN CHILDREN ==
                             *rvnn_out,
@@ -721,7 +727,9 @@ def eval_policy(env, tree_observation, policy, train_params, obs_params):
                                 *get_self_extra_states(env, obs, agent),
                                 get_agent_priority_naive(env, predictor)[agent],
                                 eval_mod.stop_dict[agent], # staticness
-                                *get_self_extra_knn_states(env, agent, agent_handles, kd_tree, k_num=5),
+
+                                # ABLATION STUDY: Remove k_nearest_agents
+                                # *get_self_extra_knn_states(env, agent, agent_handles, kd_tree, k_num=5),
 
                                 # == RVNN CHILDREN ==
                                 *rvnn_out,
