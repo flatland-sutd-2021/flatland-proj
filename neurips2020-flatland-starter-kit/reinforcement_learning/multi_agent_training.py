@@ -175,6 +175,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
         # Calculate the state size given the depth of the tree observation and the number of features
         state_size = tree_observation.observation_dim
 
+    # ABLATION STUDY: Change state size here
     if True:
         # k_best_paths: 17 + 17
         # root_extra: 15 + k * 9
@@ -182,7 +183,8 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
         state_size = (
             17 + 17
             + 15 + 5 * 9
-            + 12 * 2
+            # ABLATION STUDY: Remove RVNN
+            # + 12 * 2
             # + 5
         )
 
@@ -359,9 +361,15 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                 if True: # CH3: When it is time...
                     # NOTE: This bit might look unecessary, but it's actually
                     # needed to populate agent_prev_obs...
-                    rvnn_out = policy.rvnn(obs[agent_handle])
+                    # rvnn_out = policy.rvnn(obs[agent_handle])
                     hint = [0, 0, 0, 0, 0]
+<<<<<<< HEAD
                     # hint[hint_agent.act(agent_handle, obs[agent_handle], -1)] = 1
+=======
+                    hint[hint_agent.act(agent_handle, obs[agent_handle], -1)] = 1
+                    # ABLATION STUDY: Change state vector here
+                    # ABLATION STUDY: Remove RVNN
+>>>>>>> 26ccdb4 (removed rvnn)
                     state_vector = [
                         # == ROOT ==
                         *get_k_best_node_states(obs[agent_handle], train_env, num_agents_on_map, obs_params.observation_tree_depth),
@@ -374,7 +382,8 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                         *get_self_extra_knn_states(train_env, agent_handle, agent_handles, kd_tree, k_num=5),
 
                         # == RVNN CHILDREN ==
-                        *rvnn_out,
+                        # ABLATION STUDY: Remove RVNN
+                        # *rvnn_out,
                         # *hint
                     ]
 
@@ -419,9 +428,11 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                 agent = train_env.agents[agent_handle]
                 if info['action_required'][agent_handle]:
                     if True: # CH3: When it is time...
-                        rvnn_out = policy.rvnn(obs[agent_handle])
+                        # ABLATION STUDY: Remove RVNN
+                        # rvnn_out = policy.rvnn(obs[agent_handle])
                         hint = [0, 0, 0, 0, 0]
-                        # hint[hint_agent.act(agent_handle, obs[agent_handle], -1)] = 1
+                        hint[hint_agent.act(agent_handle, obs[agent_handle], -1)] = 1
+                        # ABLATION STUDY: Remove RVNN
                         state_vector = [
                             # == ROOT ==
                             *get_k_best_node_states(obs[agent_handle], train_env, num_agents_on_map, obs_params.observation_tree_depth),
@@ -434,7 +445,8 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                             *get_self_extra_knn_states(train_env, agent_handle, agent_handles, kd_tree, k_num=5),
 
                             # == RVNN CHILDREN ==
-                            *rvnn_out,
+                            # ABLATION STUDY: Remove RVNN
+                            # *rvnn_out,
                             # *hint
                         ]
 
@@ -709,9 +721,11 @@ def eval_policy(env, tree_observation, policy, train_params, obs_params):
                 if info['action_required'][agent]:
                     if True or tree_observation.check_is_observation_valid(agent_obs[agent]):
                         if True: # CH3: When it is time...
-                            rvnn_out = policy.rvnn(obs[agent])
+                            # rvnn_out = policy.rvnn(obs[agent])
                             hint = [0, 0, 0, 0, 0]
-                            # hint[hint_agent.act(agent, obs[agent], -1)] = 1
+                            hint[hint_agent.act(agent, obs[agent], -1)] = 1
+                            # ABLATION STUDY: Change state vector
+                            # ABLATION STUDY: Remove RVNN
                             state_vector = [
                                 # == ROOT ==
                                 *get_k_best_node_states(obs[agent], env, num_agents_on_map, obs_params.observation_tree_depth),
@@ -724,7 +738,8 @@ def eval_policy(env, tree_observation, policy, train_params, obs_params):
                                 *get_self_extra_knn_states(env, agent, agent_handles, kd_tree, k_num=5),
 
                                 # == RVNN CHILDREN ==
-                                *rvnn_out,
+                                # ABLATION STUDY: Remove RVNN
+                                # *rvnn_out,
                                 # *hint
                             ]
 
