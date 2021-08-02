@@ -363,13 +363,9 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                     # needed to populate agent_prev_obs...
                     # rvnn_out = policy.rvnn(obs[agent_handle])
                     hint = [0, 0, 0, 0, 0]
-<<<<<<< HEAD
                     # hint[hint_agent.act(agent_handle, obs[agent_handle], -1)] = 1
-=======
-                    hint[hint_agent.act(agent_handle, obs[agent_handle], -1)] = 1
                     # ABLATION STUDY: Change state vector here
                     # ABLATION STUDY: Remove RVNN
->>>>>>> 26ccdb4 (removed rvnn)
                     state_vector = [
                         # == ROOT ==
                         *get_k_best_node_states(obs[agent_handle], train_env, num_agents_on_map, obs_params.observation_tree_depth),
@@ -384,11 +380,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                         # == RVNN CHILDREN ==
                         # ABLATION STUDY: Remove RVNN
                         # *rvnn_out,
-<<<<<<< HEAD
                         # *hint
-=======
-                        *hint
->>>>>>> 844cee4 (missed one statement)
                     ]
 
 
