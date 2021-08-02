@@ -384,7 +384,11 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                         # == RVNN CHILDREN ==
                         # ABLATION STUDY: Remove RVNN
                         # *rvnn_out,
+<<<<<<< HEAD
                         # *hint
+=======
+                        *hint
+>>>>>>> 844cee4 (missed one statement)
                     ]
 
 
