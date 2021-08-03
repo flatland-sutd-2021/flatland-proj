@@ -42,9 +42,9 @@ class DeadLockAvoidanceWithDecisionAgent(HybridPolicy):
 
         if select == 0:
             if np.random.randint(0, 10) < 5:
-                return self.dead_lock_avoidance_agent.act(handle, state, -1.0)
+                return self.learning_agent.act(handle, state, eps)
 
-        return self.learning_agent.act(handle, state, eps)
+        return self.dead_lock_avoidance_agent.act(handle, state, -1.0)
 
     def save(self, filename):
         self.dead_lock_avoidance_agent.save(filename)
