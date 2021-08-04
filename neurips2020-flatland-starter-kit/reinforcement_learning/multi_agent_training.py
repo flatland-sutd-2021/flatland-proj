@@ -180,7 +180,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
         # root_extra: 15 + k * 9
         # rvnn children: 12 * k_branches
         state_size = (
-            # 17 + 17
+            17 + 17
             + 15 + 5 * 9
             + 12 * 2
             # + 5
@@ -361,10 +361,10 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                     # needed to populate agent_prev_obs...
                     rvnn_out = policy.rvnn(obs[agent_handle])
                     hint = [0, 0, 0, 0, 0]
-                    # hint[hint_agent.act(agent_handle, obs[agent_handle], -1)] = 1
+                    hint[hint_agent.act(agent_handle, obs[agent_handle], -1)] = 1
                     state_vector = [
                         # == ROOT ==
-                        # *get_k_best_node_states(obs[agent_handle], train_env, num_agents_on_map, obs_params.observation_tree_depth),
+                        *get_k_best_node_states(obs[agent_handle], train_env, num_agents_on_map, obs_params.observation_tree_depth),
 
                         # == ROOT EXTRA ==
                         train_env.number_of_agents,
@@ -375,7 +375,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
 
                         # == RVNN CHILDREN ==
                         *rvnn_out,
-                        # *hint
+                        *hint
                     ]
 
 
@@ -421,10 +421,10 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                     if True: # CH3: When it is time...
                         rvnn_out = policy.rvnn(obs[agent_handle])
                         hint = [0, 0, 0, 0, 0]
-                        # hint[hint_agent.act(agent_handle, obs[agent_handle], -1)] = 1
+                        hint[hint_agent.act(agent_handle, obs[agent_handle], -1)] = 1
                         state_vector = [
                             # == ROOT ==
-                            # *get_k_best_node_states(obs[agent_handle], train_env, num_agents_on_map, obs_params.observation_tree_depth),
+                            *get_k_best_node_states(obs[agent_handle], train_env, num_agents_on_map, obs_params.observation_tree_depth),
 
                             # == ROOT EXTRA ==
                             train_env.number_of_agents,
@@ -435,7 +435,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
 
                             # == RVNN CHILDREN ==
                             *rvnn_out,
-                            # *hint
+                            *hint
                         ]
 
                         agent_obs[agent_handle] = state_vector # CH3: OBS HACK IS HERE!!!
@@ -711,10 +711,10 @@ def eval_policy(env, tree_observation, policy, train_params, obs_params):
                         if True: # CH3: When it is time...
                             rvnn_out = policy.rvnn(obs[agent])
                             hint = [0, 0, 0, 0, 0]
-                            # hint[hint_agent.act(agent, obs[agent], -1)] = 1
+                            hint[hint_agent.act(agent, obs[agent], -1)] = 1
                             state_vector = [
                                 # == ROOT ==
-                                # *get_k_best_node_states(obs[agent], env, num_agents_on_map, obs_params.observation_tree_depth),
+                                *get_k_best_node_states(obs[agent], env, num_agents_on_map, obs_params.observation_tree_depth),
 
                                 # == ROOT EXTRA ==
                                 env.number_of_agents,
@@ -725,7 +725,7 @@ def eval_policy(env, tree_observation, policy, train_params, obs_params):
 
                                 # == RVNN CHILDREN ==
                                 *rvnn_out,
-                                # *hint
+                                *hint
                             ]
 
                             action = policy.act(agent, state_vector, eps=0.0)
