@@ -4,8 +4,7 @@ import os
 import random
 import math
 import hashlib
-
-from botocore.retries import bucket
+import json
 
 base_dir = Path(__file__).resolve().parent.parent
 sys.path.append(str(base_dir))
@@ -559,7 +558,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                 print("MAKING CHECKPOINTS DIRECTORY")
                 os.mkdir("./checkpoints/batch-run")
 
-            policy.save('./checkpoints/batch-run' + training_id + '-' + str(episode_idx) + '.pth')
+            policy.save('./checkpoints/batch-run/' + training_id + '-' + str(episode_idx) + '.pth')
 
             if save_replay_buffer:
                 policy.save_replay_buffer('./replay_buffers/' + training_id + '-' + str(episode_idx) + '.pkl')
@@ -647,6 +646,14 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
         writer.add_scalar("timer/total", training_timer.get_current(), episode_idx)
         writer.add_scalar("training/selector_proportion", policy.get_selector_proportion(), episode_idx)
         writer.flush()
+
+    scores, completions, nb_steps_eval = eval_policy(eval_env,
+                                                     tree_observation,
+                                                     policy,
+                                                     train_params,
+                                                     obs_params)
+    
+    return scores, completions, nb_steps_eval, eval_env_params
 
 
 def format_action_prob(action_probs):
@@ -788,6 +795,14 @@ class Logger(object):
 if __name__ == "__main__":
     N_EPISODES =  int(os.getenv("N_EPISODES", 10))
     HIDDEN_SIZE = int(os.getenv("HIDDEN_SIZE", 256))
+
+    GETTING_CLOSER      = float(os.getenv("REWARD_GETTING_CLOSER", GETTING_CLOSER))
+    GETTING_FURTHER     = float(os.getenv("REWARD_GETTING_FURTHER", GETTING_FURTHER))
+    REACH_EARLY         = float(os.getenv("REWARD_REACH_EARLY", REACH_EARLY))
+    FINAL_INCOMPLETE    = float(os.getenv("REWARD_FINAL_INCOMPLETE", FINAL_INCOMPLETE))
+    STOPPING_PENALTY    = float(os.getenv("REWARD_STOPPING_PENALTY", STOPPING_PENALTY))
+    DEADLOCK_THRESH     = float(os.getenv("REWARD_DEADLOCK_THRESH", DEADLOCK_THRESH))
+    DEADLOCK_PENALTY    = float(os.getenv("REWARD_DEADLOCK_PENALTY", DEADLOCK_PENALTY))
 
     run_params = {
         "N_EPISODES"    : N_EPISODES
@@ -945,15 +960,35 @@ if __name__ == "__main__":
     pprint(obs_params)
 
     os.environ["OMP_NUM_THREADS"] = str(training_params.num_threads)
-    train_agent(training_params, Namespace(**training_env_params), Namespace(**evaluation_env_params),
+    scores, completions, nb_steps_eval, eval_env_params = train_agent(training_params, Namespace(**training_env_params), Namespace(**evaluation_env_params),
                 Namespace(**obs_params))
 
     # stop logging
     logger.close()
 
+    # write summary file
+    summary = {
+        "run_params": run_params,
+        "hyperparams": hyperparams,
+        "reward_params": reward_params,
+        "training_params": vars(training_params),
+        "eval": {
+            "eval_env_params": vars(eval_env_params),
+            "scores": scores,
+            "completions": completions,
+            "nb_steps_eval": nb_steps_eval,
+        }
+    }
+
+    metadata_file = params_hash + "_metadata.json"
+    with open(metadata_file, "w+") as f:
+        json.dump(summary, f, indent=4)
+
+
     # move everything to an output folder and zip it up
     import shutil
     os.mkdir(params_hash)
+    shutil.copy2(metadata_file, params_hash) # copy metadata file
     shutil.copy2(log_path, params_hash) # copy log file
     shutil.copytree("runs/batch-run", params_hash+"/runs") # copy runs
     if os.path.isdir("checkpoints/batch-run"):
