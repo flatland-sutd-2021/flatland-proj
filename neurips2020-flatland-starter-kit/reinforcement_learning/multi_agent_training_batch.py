@@ -6,6 +6,8 @@ import math
 import hashlib
 import json
 
+from botocore.retries import bucket
+
 base_dir = Path(__file__).resolve().parent.parent
 sys.path.append(str(base_dir))
 
