@@ -3,6 +3,10 @@ import sys
 import os
 import random
 import math
+import hashlib
+import json
+
+from botocore.retries import bucket
 
 base_dir = Path(__file__).resolve().parent.parent
 sys.path.append(str(base_dir))
@@ -37,12 +41,6 @@ from utils.timer import Timer
 from utils.observation_utils import normalize_observation
 from utils.fast_tree_obs import FastTreeObs
 
-try:
-    import wandb
-
-    wandb.init(sync_tensorboard=True)
-except ImportError:
-    print("Install wandb to log to Weights & Biases")
 
 """
 This file shows how to train multiple agents using a reinforcement learning approach.
@@ -175,16 +173,16 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
         # Calculate the state size given the depth of the tree observation and the number of features
         state_size = tree_observation.observation_dim
 
+    # ABLATION STUDY: Change state size here
     if True:
         # k_best_paths: 17 + 17
         # root_extra: 15 + k * 9
         # rvnn children: 12 * k_branches
         state_size = (
             17 + 17
-            + 15
-            + 5 * 9
+            + 15 + 5 * 9
             + 12 * 2
-            # + 5
+            + 5
         )
 
     action_count = [0] * get_flatland_full_action_size()
@@ -253,7 +251,8 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                 hdd.free / (2 ** 30)))
 
     # TensorBoard writer
-    writer = SummaryWriter(comment="_" + train_params.policy + "_" + train_params.action_size)
+    # change log_dir for batch
+    writer = SummaryWriter(log_dir="runs/batch-run", comment="_" + train_params.policy + "_" + train_params.action_size)
 
     training_timer = Timer()
     training_timer.start()
@@ -284,7 +283,8 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
             train_env_params.n_agents = n_agents
         else:
             if True: # CH3: Incrementing difficulty
-                if (episode_idx % (n_episodes // 30)) == 1 or success_count > SUCCESS_THRESHOLD:
+                # hardcode n_episodes to 5000
+                if (episode_idx % (5000 // 30)) == 1 or success_count > SUCCESS_THRESHOLD:
                     success_count = 0
 
                     # Make an eval env based on the PREVIOUS difficulty!!
@@ -301,7 +301,8 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                     # Malfunction interval is the minimum number of intervals between malfunctions
                     # As agent count increases, malfunctions from individual agents become MORE SPARSE
                     # since more time is allotted to completing the environmenet
-                    malfunction_interval = int(250 * (episode_idx // (n_episodes // 11)))
+                    # hardcode n_episodes to 5000
+                    malfunction_interval = int(250 * (episode_idx // (5000 // 11)))
                     if malfunction_interval == 0:
                         train_env_params.malfunction_rate = 0
                     else:
@@ -362,7 +363,7 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                     # needed to populate agent_prev_obs...
                     rvnn_out = policy.rvnn(obs[agent_handle])
                     hint = [0, 0, 0, 0, 0]
-                    # hint[hint_agent.act(agent_handle, obs[agent_handle], -1)] = 1
+                    hint[hint_agent.act(agent_handle, obs[agent_handle], -1)] = 1
                     state_vector = [
                         # == ROOT ==
                         *get_k_best_node_states(obs[agent_handle], train_env, num_agents_on_map, obs_params.observation_tree_depth),
@@ -372,12 +373,11 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                         *get_self_extra_states(train_env, obs, agent_handle),
                         get_agent_priority_naive(train_env, predictor)[agent_handle],
                         0, # staticness
-
                         *get_self_extra_knn_states(train_env, agent_handle, agent_handles, kd_tree, k_num=5),
 
                         # == RVNN CHILDREN ==
                         *rvnn_out,
-                        # *hint
+                        *hint
                     ]
 
 
@@ -421,9 +421,10 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                 agent = train_env.agents[agent_handle]
                 if info['action_required'][agent_handle]:
                     if True: # CH3: When it is time...
+                        # ABLATION STUDY: Remove RVNN
                         rvnn_out = policy.rvnn(obs[agent_handle])
                         hint = [0, 0, 0, 0, 0]
-                        # hint[hint_agent.act(agent_handle, obs[agent_handle], -1)] = 1
+                        hint[hint_agent.act(agent_handle, obs[agent_handle], -1)] = 1
                         state_vector = [
                             # == ROOT ==
                             *get_k_best_node_states(obs[agent_handle], train_env, num_agents_on_map, obs_params.observation_tree_depth),
@@ -433,12 +434,11 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
                             *get_self_extra_states(train_env, obs, agent_handle),
                             get_agent_priority_naive(train_env, predictor)[agent_handle],
                             reward_mod.stop_dict[agent_handle], # staticness
-
                             *get_self_extra_knn_states(train_env, agent_handle, agent_handles, kd_tree, k_num=5),
 
                             # == RVNN CHILDREN ==
                             *rvnn_out,
-                            # *hint
+                            *hint
                         ]
 
                         agent_obs[agent_handle] = state_vector # CH3: OBS HACK IS HERE!!!
@@ -556,11 +556,11 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
 
         # Print logs
         if episode_idx % checkpoint_interval == 0 and episode_idx > 0:
-            if not os.path.isdir("./checkpoints"):
+            if not os.path.isdir("./checkpoints/batch-run"):
                 print("MAKING CHECKPOINTS DIRECTORY")
-                os.mkdir("./checkpoints")
+                os.mkdir("./checkpoints/batch-run")
 
-            policy.save('./checkpoints/' + training_id + '-' + str(episode_idx) + '.pth')
+            policy.save('./checkpoints/batch-run/' + training_id + '-' + str(episode_idx) + '.pth')
 
             if save_replay_buffer:
                 policy.save_replay_buffer('./replay_buffers/' + training_id + '-' + str(episode_idx) + '.pkl')
@@ -649,6 +649,14 @@ def train_agent(train_params, train_env_params, eval_env_params, obs_params):
         writer.add_scalar("training/selector_proportion", policy.get_selector_proportion(), episode_idx)
         writer.flush()
 
+    scores, completions, nb_steps_eval = eval_policy(eval_env,
+                                                     tree_observation,
+                                                     policy,
+                                                     train_params,
+                                                     obs_params)
+    
+    return scores, completions, nb_steps_eval, eval_env_params
+
 
 def format_action_prob(action_probs):
     action_probs = np.round(action_probs, 3)
@@ -714,7 +722,7 @@ def eval_policy(env, tree_observation, policy, train_params, obs_params):
                         if True: # CH3: When it is time...
                             rvnn_out = policy.rvnn(obs[agent])
                             hint = [0, 0, 0, 0, 0]
-                            # hint[hint_agent.act(agent, obs[agent], -1)] = 1
+                            hint[hint_agent.act(agent, obs[agent], -1)] = 1
                             state_vector = [
                                 # == ROOT ==
                                 *get_k_best_node_states(obs[agent], env, num_agents_on_map, obs_params.observation_tree_depth),
@@ -724,12 +732,11 @@ def eval_policy(env, tree_observation, policy, train_params, obs_params):
                                 *get_self_extra_states(env, obs, agent),
                                 get_agent_priority_naive(env, predictor)[agent],
                                 eval_mod.stop_dict[agent], # staticness
-
                                 *get_self_extra_knn_states(env, agent, agent_handles, kd_tree, k_num=5),
 
                                 # == RVNN CHILDREN ==
                                 *rvnn_out,
-                                # *hint
+                                *hint
                             ]
 
                             action = policy.act(agent, state_vector, eps=0.0)
@@ -768,43 +775,102 @@ def eval_policy(env, tree_observation, policy, train_params, obs_params):
     return scores, completions, nb_steps
 
 
-if __name__ == "__main__":
-    parser = ArgumentParser()
-    parser.add_argument("-n", "--n_episodes", help="number of episodes to run", default=5000, type=int)
-    parser.add_argument("--n_agent_fixed", help="hold the number of agent fixed", action='store_true')
-    parser.add_argument("-t", "--training_env_config", help="training config id (eg 0 for Test_0)", default=1,
-                        type=int)
-    parser.add_argument("-e", "--evaluation_env_config", help="evaluation config id (eg 0 for Test_0)", default=1,
-                        type=int)
-    parser.add_argument("--n_evaluation_episodes", help="number of evaluation episodes", default=5, type=int)
-    parser.add_argument("--checkpoint_interval", help="checkpoint interval", default=100, type=int)
-    parser.add_argument("--eps_start", help="max exploration", default=1.0, type=float)
-    parser.add_argument("--eps_end", help="min exploration", default=0.01, type=float)
-    parser.add_argument("--eps_decay", help="exploration decay", default=0.9975, type=float)
-    parser.add_argument("--buffer_size", help="replay buffer size", default=int(32_000), type=int)
-    parser.add_argument("--buffer_min_size", help="min buffer size to start training", default=0, type=int)
-    parser.add_argument("--restore_replay_buffer", help="replay buffer to restore", default="", type=str)
-    parser.add_argument("--save_replay_buffer", help="save replay buffer at each evaluation interval", default=False,
-                        type=bool)
-    parser.add_argument("--batch_size", help="minibatch size", default=128, type=int)
-    parser.add_argument("--gamma", help="discount factor", default=0.97, type=float)
-    parser.add_argument("--tau", help="soft update of target parameters", default=0.5e-3, type=float)
-    parser.add_argument("--learning_rate", help="learning rate", default=0.5e-4, type=float)
-    parser.add_argument("--hidden_size", help="hidden size (2 fc layers)", default=256, type=int)
-    parser.add_argument("--update_every", help="how often to update the network", default=10, type=int)
-    parser.add_argument("--use_gpu", help="use GPU if available", default=False, type=bool)
-    parser.add_argument("--num_threads", help="number of threads PyTorch can use", default=8, type=int)
-    parser.add_argument("--render", help="render 1 episode in 100", action='store_true')
-    parser.add_argument("--load_policy", help="policy filename (reference) to load", default="", type=str)
-    parser.add_argument("--use_fast_tree_observation", help="use FastTreeObs instead of stock TreeObs",
-                        action='store_true')
-    parser.add_argument("--max_depth", help="max depth", default=2, type=int)
-    parser.add_argument("--policy",
-                        help="policy name [DDDQN, PPO, DeadLockAvoidance, DeadLockAvoidanceWithDecision, MultiDecision]",
-                        default="DeadLockAvoidance")
-    parser.add_argument("--action_size", help="define the action size [reduced,full]", default="full", type=str)
+class Logger(object):
+    def __init__(self, path):
+        self.terminal = sys.stdout
+        self.log = open(path, "w+")
 
-    training_params = parser.parse_args()
+    def write(self, message):
+        self.terminal.write(message)
+        self.log.write(message)  
+
+    def close(self):
+        self.log.close()
+
+    def flush(self):
+        #this flush method is needed for python 3 compatibility.
+        #this handles the flush command by doing nothing.
+        #you might want to specify some extra behavior here.
+        pass
+
+
+if __name__ == "__main__":
+    N_EPISODES =  int(os.getenv("N_EPISODES", 10))
+    HIDDEN_SIZE = int(os.getenv("HIDDEN_SIZE", 256))
+
+    GETTING_CLOSER      = float(os.getenv("REWARD_GETTING_CLOSER", GETTING_CLOSER))
+    GETTING_FURTHER     = float(os.getenv("REWARD_GETTING_FURTHER", GETTING_FURTHER))
+    REACH_EARLY         = float(os.getenv("REWARD_REACH_EARLY", REACH_EARLY))
+    FINAL_INCOMPLETE    = float(os.getenv("REWARD_FINAL_INCOMPLETE", FINAL_INCOMPLETE))
+    STOPPING_PENALTY    = float(os.getenv("REWARD_STOPPING_PENALTY", STOPPING_PENALTY))
+    DEADLOCK_THRESH     = float(os.getenv("REWARD_DEADLOCK_THRESH", DEADLOCK_THRESH))
+    DEADLOCK_PENALTY    = float(os.getenv("REWARD_DEADLOCK_PENALTY", DEADLOCK_PENALTY))
+
+    run_params = {
+        "N_EPISODES"    : N_EPISODES
+    }
+
+    hyperparams = {
+        "HIDDEN_SIZE"   : HIDDEN_SIZE,
+    }
+
+    reward_params = {
+        "GETTING_CLOSER"   : GETTING_CLOSER,
+        "GETTING_FURTHER"  : GETTING_FURTHER,
+        "REACH_EARLY"      : REACH_EARLY,
+        "FINAL_INCOMPLETE" : FINAL_INCOMPLETE,
+        "STOPPING_PENALTY" : STOPPING_PENALTY,
+        "DEADLOCK_THRESH"  : DEADLOCK_THRESH,
+        "DEADLOCK_PENALTY" : DEADLOCK_PENALTY
+    }
+
+    # hash of reward params and hyperparams
+    params_hash = hashlib.md5(str({**run_params, **hyperparams, **reward_params}).encode()).hexdigest()
+
+    # redirect output to log
+    log_path = params_hash + ".log"
+    logger = Logger(log_path)
+    sys.stdout = logger
+
+    print("run_params:")
+    pprint(run_params)
+    print("\nhyperparams:")
+    pprint(hyperparams)
+    print("\nreward_params:")
+    pprint(reward_params)
+    
+    training_params = {
+        'action_size': 'full',
+        'batch_size': 128,
+        'buffer_min_size': 0,
+        'buffer_size': 32000,
+        'checkpoint_interval': 100,
+        'eps_decay': 0.9975,
+        'eps_end': 0.01,
+        'eps_start': 1.0,
+        'evaluation_env_config': 1,
+        'gamma': 0.97,
+        'hidden_size': HIDDEN_SIZE,
+        'learning_rate': 5e-05,
+        'load_policy': '',
+        'max_depth': 2,
+        'n_agent_fixed': False,
+        'n_episodes': N_EPISODES,
+        'n_evaluation_episodes': 5,
+        'num_threads': 8,
+        'policy': 'SUTD',
+        'render': False,
+        'restore_replay_buffer': '',
+        'save_replay_buffer': False,
+        'tau': 0.0005,
+        'training_env_config': 1,
+        'update_every': 10,
+        'use_fast_tree_observation': False,
+        'use_gpu': True
+    }
+
+    training_params = Namespace(**training_params)
+
     env_params = [
         {
             # Test_0
@@ -876,7 +942,6 @@ if __name__ == "__main__":
                 len(env_params) - 1))
             exit(1)
 
-
     check_env_config(training_params.training_env_config)
     check_env_config(training_params.evaluation_env_config)
 
@@ -897,5 +962,46 @@ if __name__ == "__main__":
     pprint(obs_params)
 
     os.environ["OMP_NUM_THREADS"] = str(training_params.num_threads)
-    train_agent(training_params, Namespace(**training_env_params), Namespace(**evaluation_env_params),
+    scores, completions, nb_steps_eval, eval_env_params = train_agent(training_params, Namespace(**training_env_params), Namespace(**evaluation_env_params),
                 Namespace(**obs_params))
+
+    # stop logging
+    logger.close()
+
+    # write summary file
+    summary = {
+        "run_params": run_params,
+        "hyperparams": hyperparams,
+        "reward_params": reward_params,
+        "training_params": vars(training_params),
+        "eval": {
+            "eval_env_params": vars(eval_env_params),
+            "scores": scores,
+            "completions": completions,
+            "nb_steps_eval": nb_steps_eval,
+        }
+    }
+
+    metadata_file = params_hash + "_metadata.json"
+    with open(metadata_file, "w+") as f:
+        json.dump(summary, f, indent=4)
+
+
+    # move everything to an output folder and zip it up
+    import shutil
+    os.mkdir(params_hash)
+    shutil.copy2(metadata_file, params_hash) # copy metadata file
+    shutil.copy2(log_path, params_hash) # copy log file
+    shutil.copytree("runs/batch-run", params_hash+"/runs") # copy runs
+    if os.path.isdir("checkpoints/batch-run"):
+        shutil.copytree("checkpoints/batch-run", params_hash+"/checkpoints") # copy checkpoints
+    shutil.make_archive(params_hash, "zip", params_hash) # make archive
+
+    # upload to s3
+    import boto3
+    client = boto3.client('s3')
+
+    file_name = params_hash + ".zip"
+    object_name = params_hash + "_" + str(datetime.now()) + ".zip"
+
+    client.upload_file(file_name, "flatland-train-output", object_name)
