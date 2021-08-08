@@ -1,0 +1,2 @@
+Aug04_03-09-10_methyl-MX15_SUTD_full: no k_best_path, half-selector, no hint
+Aug04_03-24-59_methyl-MX15_SUTD_full: full-state, half-selector, no hint
