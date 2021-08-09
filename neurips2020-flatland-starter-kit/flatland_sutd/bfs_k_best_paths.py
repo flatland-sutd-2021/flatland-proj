@@ -54,7 +54,6 @@ def get_k_best_nodes(root, depth_limit=4, k=2, pad_output=True):
             continue
 
         children = _get_child_tuples(node_tuple)
-
         if len(children) == 0 or node_tuple[1] >= depth_limit: # Terminal node
             unsorted_terminal_node_tuples.append(node_tuple)
             continue
