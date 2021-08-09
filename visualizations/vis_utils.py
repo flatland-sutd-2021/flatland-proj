@@ -25,7 +25,7 @@ from reinforcement_learning.deadlockavoidance_with_decision_agent import (
 )
 
 
-def create_params(n_agents=2):
+def create_params(n_agents=2, hidden_size=256):
     env_params = {
         "n_agents": n_agents,
         "x_dim": 30,
@@ -61,7 +61,7 @@ def create_params(n_agents=2):
         "gamma": 0.97,
         "tau": 0.0005,
         "learning_rate": 5e-05,
-        "hidden_size": 256,
+        "hidden_size": hidden_size,
         "update_every": 10,
         "use_gpu": False,
         "num_threads": 4,
@@ -143,8 +143,8 @@ def load_context(path):
     return c["env"], c["tree_obs"], c["env_params"], c["obs_params"], c["train_params"]
 
 
-def create_and_store_context(n_agents):
-    env_params, obs_params, train_params = create_params(n_agents=n_agents)
+def create_and_store_context(n_agents, hidden_size):
+    env_params, obs_params, train_params = create_params(n_agents=n_agents, hidden_size=hidden_size)
     env, tree_observation, obs_params = create_env(env_params, obs_params)
 
     delattr(tree_observation, "check_is_observation_valid")
@@ -158,7 +158,7 @@ def create_and_store_context(n_agents):
         "train_params": train_params,
     }
 
-    path = f"agents_{n_agents}.context.pickle"
+    path = f"agents_{n_agents}_hidsize_{hidden_size}.context.pickle"
 
     with open(path, "wb") as f:
         pickle.dump(o, f)

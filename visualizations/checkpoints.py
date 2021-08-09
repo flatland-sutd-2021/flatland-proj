@@ -11,14 +11,16 @@ checkpoints = {
         "description": "",
         "trained_episodes": 1000,
         "state_size": (17 + 17) + (15 + 5 * 9) + (12 * 2),
+        "hidden_size": 256,
     },
-    # "ablation-k-best-paths-1000": {
-    #     "path": "/ablation-k-best-paths-1000/",
-    #     "training_id": "210803115112",
-    #     "description": "",
-    #     "trained_episodes": 1000,
-    #     "state_size": (15 + 5 * 9) + (12 * 2),
-    # },
+    "ablation-k-best-paths-1000": {
+        "path": "/ablation-k-best-paths-1000/",
+        "training_id": "210803115112",
+        "description": "",
+        "trained_episodes": 1000,
+        "state_size": (17 + 17) + (15 + 5 * 9) + (12 * 2),
+        "hidden_size": 256,
+    },
     # "ablation-k-nearest-agents-1000": {
     #     "path": "/ablation-k-nearest-agents-1000/",
     #     "training_id": "210803003108",
