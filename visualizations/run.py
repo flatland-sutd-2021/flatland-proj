@@ -104,12 +104,12 @@ def compare_recorded_runs():
         r_env_record.get_record_length(),
     ]
 
-    step = st.sidebar.slider("Step Number:", min_value=0, max_value=max(records_length))
+    step = st.sidebar.slider("Step Number:", min_value=0, max_value=max(records_length)-1)
 
     for display, env_record in [(l_display, l_env_record), (r_display, r_env_record)]:
         renderer = RenderTool(env_record, gl="PIL")
-
-        display_step = max(step, l_env_record.get_record_length())
+            
+        display_step = min(step, env_record.get_record_length()-1)
 
         image = get_env_step_image(env_record, renderer, display_step)
 
