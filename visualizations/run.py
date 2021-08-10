@@ -108,10 +108,13 @@ def compare_recorded_runs():
 
     for display, env_record in [(l_display, l_env_record), (r_display, r_env_record)]:
         renderer = RenderTool(env_record, gl="PIL")
-        image = get_env_step_image(env_record, renderer, step)
+
+        display_step = max(step, l_env_record.get_record_length())
+
+        image = get_env_step_image(env_record, renderer, display_step)
 
         fig, ax = plt.subplots()
-        ax.set_title(f"Step {step}")
+        ax.set_title(f"Step {display_step}")
         ax.set_axis_off()
         ax.imshow(image)
         display.write(fig)
