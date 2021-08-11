@@ -1,5 +1,6 @@
 # builtin modules
 import os
+import sys
 from copy import deepcopy
 
 # internal modules
@@ -19,6 +20,7 @@ for n_agents in AGENT_COUNTS:
         eps = meta["trained_episodes"]
         hidsize = meta["hidden_size"]
         state_size = meta["state_size"]
+        using_hint = meta["using_hint"]
         checkpoint = os.path.normpath(
             STARTER_PATH
             + CHECKPOINTS_PATH
@@ -43,6 +45,7 @@ for n_agents in AGENT_COUNTS:
                 policy,
                 train_params,
                 obs_params,
+                using_hint=using_hint,
             )
         except Exception as e:
             print(e)
