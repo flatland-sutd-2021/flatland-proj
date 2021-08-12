@@ -1,5 +1,6 @@
 # builtin modules
 import os
+import sys
 from copy import deepcopy
 
 # internal modules
@@ -7,6 +8,7 @@ from vis_utils import STARTER_PATH, ENV_RECORDS_PATH
 from vis_utils import create_params, create_env, create_policy, load_context
 from vis_eval import eval_policy_visual, generate_gif
 from checkpoints import checkpoints
+
 
 AGENT_COUNTS = [1, 2, 5, 7, 9]
 CHECKPOINTS_PATH = "/reinforcement_learning/checkpoints/"
@@ -18,6 +20,7 @@ for n_agents in AGENT_COUNTS:
         eps = meta["trained_episodes"]
         hidsize = meta["hidden_size"]
         state_size = meta["state_size"]
+        using_hint = meta["using_hint"]
         checkpoint = os.path.normpath(
             STARTER_PATH
             + CHECKPOINTS_PATH
@@ -35,16 +38,17 @@ for n_agents in AGENT_COUNTS:
 
         policy = create_policy(env, state_size, train_params, checkpoint)
 
-        # try:
-        record_env, score, completion, step = eval_policy_visual(
-            env,
-            tree_obs,
-            policy,
-            train_params,
-            obs_params,
-        )
-        # except Exception as e:
-        #     print(e)
-        #     continue
+        try:
+            record_env, score, completion, step = eval_policy_visual(
+                env,
+                tree_obs,
+                policy,
+                train_params,
+                obs_params,
+                using_hint=using_hint,
+            )
+        except Exception as e:
+            print(e)
+            continue
 
         record_env.pickle(filename)
