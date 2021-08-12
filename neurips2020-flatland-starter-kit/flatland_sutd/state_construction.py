@@ -3,7 +3,6 @@ from flatland.envs.rail_generators import sparse_rail_generator
 from flatland.envs.schedule_generators import sparse_schedule_generator
 from flatland.envs.observations import TreeObsForRailEnv, GlobalObsForRailEnv
 from flatland.utils.rendertools import RenderTool
-from ..utils.observation_utils import normalize_observation
 from flatland.envs.agent_utils import RailAgentStatus
 
 from sklearn.neighbors import KDTree

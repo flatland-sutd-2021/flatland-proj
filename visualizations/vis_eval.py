@@ -256,6 +256,7 @@ def generate_gif(path: str, record_env: RailEnvRecord):
     env_images = []
 
     for i in range(record_env.get_record_length()):
+        print("\r", "generating image", i, "/", record_env.get_record_length(), end="")
         record_env.set_record_step(i)
         renderer.render_env(show_observations=False)
         env_images.append(renderer.get_image())
@@ -263,6 +264,7 @@ def generate_gif(path: str, record_env: RailEnvRecord):
     frames = []
 
     for idx, image in enumerate(env_images):
+        print("\r", "plotting image", idx, "/", len(env_images), end="")
         plt.ioff()
         plt.clf()
 
