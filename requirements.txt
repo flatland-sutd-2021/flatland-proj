@@ -4,7 +4,7 @@ imageio==2.9.0
 matplotlib==3.4.2
 flatland_rl==2.2.2
 flatland==0.9.1
-utils==1.0.1
 psutil==5.7.2
 gym==0.14.0
 torch==1.9.0
+sklearn==0.24.2
